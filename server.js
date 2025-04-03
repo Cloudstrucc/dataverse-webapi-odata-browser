@@ -1,4 +1,5 @@
 // server.js
+require('dotenv').config(); // Load environment variables from .env file
 const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
@@ -12,13 +13,13 @@ const parser = new xml2js.Parser({ explicitArray: false });
 
 const app = express();
 
-// Replace these with your Azure AD app configuration
+// Use environment variables for Azure AD configuration
 const azureConfig = {
   clientId: '66323902-24bb-43fa-8912-a311e6d73f2f',
   authority: 'https://login.microsoftonline.com/24a46daa-7b87-4566-9eea-281326a1b75c',
-  clientSecret: '',
+  clientSecret: process.env.client_secret, // Use from .env file
   redirectUri: 'http://localhost:3000/auth/callback',
-  scopes: ['https://vcs-website-csdev.crm3.dynamics.com/.default'] // Adjust scopes as needed
+  scopes: ['https://vcs-website-csdev.crm3.dynamics.com/.default']
 };
 
 // Create temp directory for processing files if it doesn't exist
@@ -30,10 +31,10 @@ if (!fs.existsSync(tempDir)) {
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-// Setup session middleware to store token information.
+// Setup session middleware with secret from .env
 app.use(
   session({
-    secret: '',
+    secret: process.env.session_secret, // Use from .env file
     resave: false,
     saveUninitialized: false,
   })
@@ -58,10 +59,12 @@ app.get('/', (req, res) => {
       <a href="/auth/login">Sign In with Azure AD</a>
     `);
   } else {
+    // Use Dataverse URL from .env as default value in the form
     res.send(`
       <h1>Enter Your Dataverse Environment URL</h1>
       <form method="POST" action="/generate-docs">
-        <input type="text" name="envUrl" placeholder="https://vcs-website-csdev.api.crm3.dynamics.com/api/data/v9.2/" required style="width:300px;">
+        <input type="text" name="envUrl" placeholder="https://your-org.api.crm.dynamics.com/api/data/v9.2/" 
+               value="${process.env.dataverse_url || ''}" required style="width:300px;">
         <button type="submit">See API Docs</button>
       </form>
     `);
@@ -109,7 +112,9 @@ let openApiSpec = null;
 
 // Endpoint to process the Dataverse URL and generate API docs.
 app.post('/generate-docs', async (req, res) => {
-  const { envUrl } = req.body;
+  // Use the form-submitted URL or fall back to .env value
+  const envUrl = req.body.envUrl || process.env.dataverse_url;
+  
   // Store the base URL in the session for later use
   req.session.baseApiUrl = envUrl;
   
@@ -588,4 +593,5 @@ app.get('/swagger-ui', (req, res) => {
 const port = 3000;
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
+  console.log(`Environment loaded - Using Dataverse URL: ${process.env.dataverse_url || 'Not set'}`);
 });
