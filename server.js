@@ -28,6 +28,12 @@ if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir);
 }
 
+// Create public directory for static files
+const publicDir = path.join(__dirname, 'public');
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir);
+}
+
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
@@ -54,19 +60,134 @@ const cca = new msal.ConfidentialClientApplication(msalConfig);
 // Home route: if not signed in, offer sign-in. Otherwise, show form for Dataverse URL.
 app.get('/', (req, res) => {
   if (!req.session.token) {
+    // Render the login page with Bootstrap styling
     res.send(`
-      <h1>Welcome</h1>
-      <a href="/auth/login">Sign In with Azure AD</a>
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Dataverse API Explorer</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+          html, body {
+            height: 100%;
+          }
+          
+          body {
+            display: flex;
+            align-items: center;
+            padding-top: 40px;
+            padding-bottom: 40px;
+            background-color: #f5f5f5;
+          }
+          
+          .form-signin {
+            width: 100%;
+            max-width: 400px;
+            padding: 15px;
+            margin: auto;
+          }
+          
+          .form-signin .form-floating:focus-within {
+            z-index: 2;
+          }
+          
+          .brand-logo {
+            height: 60px;
+            margin-bottom: 1.5rem;
+          }
+          
+          .signin-btn {
+            margin-top: 15px;
+          }
+        </style>
+      </head>
+      <body class="text-center">
+        <main class="form-signin">
+          <img class="brand-logo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Power_Apps_logo.svg/1200px-Power_Apps_logo.svg.png" alt="Dataverse Logo">
+          <h1 class="h3 mb-3 fw-normal">Dataverse API Explorer</h1>
+          <p class="mb-3 text-muted">Access documentation for your Dataverse environment APIs</p>
+          
+          <div class="card p-3 bg-light">
+            <p class="text-start mb-3">Sign in with your Microsoft account to access your Dataverse environment.</p>
+            <a href="/auth/login" class="w-100 btn btn-lg btn-primary signin-btn">Sign in with Microsoft</a>
+          </div>
+          <p class="mt-5 mb-3 text-muted">&copy; 2025 Dataverse API Explorer</p>
+        </main>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+      </body>
+      </html>
     `);
   } else {
-    // Use Dataverse URL from .env as default value in the form
+    // Render the Dataverse URL form with Bootstrap styling
     res.send(`
-      <h1>Enter Your Dataverse Environment URL</h1>
-      <form method="POST" action="/generate-docs">
-        <input type="text" name="envUrl" placeholder="https://your-org.api.crm.dynamics.com/api/data/v9.2/" 
-               value="${process.env.dataverse_url || ''}" required style="width:300px;">
-        <button type="submit">See API Docs</button>
-      </form>
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Dataverse API Explorer</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+          html, body {
+            height: 100%;
+          }
+          
+          body {
+            display: flex;
+            align-items: center;
+            padding-top: 40px;
+            padding-bottom: 40px;
+            background-color: #f5f5f5;
+          }
+          
+          .form-dataverse {
+            width: 100%;
+            max-width: 600px;
+            padding: 15px;
+            margin: auto;
+          }
+          
+          .form-dataverse .form-control:focus {
+            z-index: 2;
+          }
+          
+          .brand-logo {
+            height: 60px;
+            margin-bottom: 1.5rem;
+          }
+        </style>
+      </head>
+      <body class="text-center">
+        <main class="form-dataverse">
+          <img class="brand-logo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Power_Apps_logo.svg/1200px-Power_Apps_logo.svg.png" alt="Dataverse Logo">
+          <h1 class="h3 mb-3 fw-normal">Generate API Documentation</h1>
+          
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title mb-3">Enter Your Dataverse Environment URL</h5>
+              <form method="POST" action="/generate-docs" class="p-2">
+                <div class="form-floating mb-3">
+                  <input type="text" class="form-control" id="envUrl" name="envUrl" 
+                         placeholder="https://your-org.api.crm.dynamics.com/api/data/v9.2/" 
+                         value="${process.env.dataverse_url || ''}" required>
+                  <label for="envUrl">Dataverse Environment URL</label>
+                </div>
+                <button class="w-100 btn btn-lg btn-primary" type="submit">Generate API Docs</button>
+              </form>
+            </div>
+          </div>
+          
+          <div class="mt-3">
+            <a href="/auth/logout" class="text-muted">Sign Out</a>
+          </div>
+          
+          <p class="mt-5 mb-3 text-muted">&copy; 2025 Dataverse API Explorer</p>
+        </main>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+      </body>
+      </html>
     `);
   }
 });
@@ -107,6 +228,17 @@ app.get('/auth/callback', (req, res) => {
     });
 });
 
+// Add logout route
+app.get('/auth/logout', (req, res) => {
+  // Clear session and redirect to home
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Error destroying session:', err);
+    }
+    res.redirect('/');
+  });
+});
+
 // Global variable to store the generated OpenAPI specification.
 let openApiSpec = null;
 
@@ -127,6 +259,78 @@ app.post('/generate-docs', async (req, res) => {
     metadataUrl += '$metadata';
   }
 
+  try {
+    // Create a simple loading page
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Generating Documentation...</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+          html, body {
+            height: 100%;
+          }
+          
+          body {
+            display: flex;
+            align-items: center;
+            padding-top: 40px;
+            padding-bottom: 40px;
+            background-color: #f5f5f5;
+          }
+          
+          .loading-container {
+            width: 100%;
+            max-width: 500px;
+            padding: 15px;
+            margin: auto;
+            text-align: center;
+          }
+          
+          .spinner-border {
+            width: 5rem;
+            height: 5rem;
+            margin-bottom: 1.5rem;
+          }
+        </style>
+        <meta http-equiv="refresh" content="2;url=/process-metadata?url=${encodeURIComponent(envUrl)}" />
+      </head>
+      <body>
+        <main class="loading-container">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <h1 class="h3 mb-3 fw-normal">Generating API Documentation</h1>
+          <p class="text-muted">Fetching metadata from Dataverse and processing...</p>
+          <div class="progress mt-4">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+          </div>
+        </main>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('Error creating loading page:', error);
+    res.status(500).send("Error starting documentation generation. Please try again.");
+  }
+});
+
+// Separate endpoint to actually process the metadata (called by the redirect)
+app.get('/process-metadata', async (req, res) => {
+  const envUrl = req.query.url;
+  
+  // Construct the metadata URL if needed
+  let metadataUrl = envUrl;
+  if (!metadataUrl.endsWith('$metadata')) {
+    if (!metadataUrl.endsWith('/')) {
+      metadataUrl += '/';
+    }
+    metadataUrl += '$metadata';
+  }
+  
   try {
     // Fetch the metadata from Dataverse as XML (default OData format)
     const response = await axios.get(metadataUrl, {
@@ -156,7 +360,57 @@ app.post('/generate-docs', async (req, res) => {
       console.error('Response status:', error.response.status);
       console.error('Response data:', error.response.data);
     }
-    res.status(500).send("Error fetching metadata from the provided Dataverse URL. Please check console for details.");
+    
+    // Show error page with Bootstrap styling
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Error - Dataverse API Explorer</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+          html, body {
+            height: 100%;
+          }
+          
+          body {
+            display: flex;
+            align-items: center;
+            padding-top: 40px;
+            padding-bottom: 40px;
+            background-color: #f5f5f5;
+          }
+          
+          .error-container {
+            width: 100%;
+            max-width: 600px;
+            padding: 15px;
+            margin: auto;
+            text-align: center;
+          }
+        </style>
+      </head>
+      <body>
+        <main class="error-container">
+          <div class="card text-center border-danger">
+            <div class="card-header bg-danger text-white">
+              <h4 class="my-0">Error</h4>
+            </div>
+            <div class="card-body">
+              <h5 class="card-title">Unable to Generate API Documentation</h5>
+              <p class="card-text">${error.message || 'Error fetching metadata from the provided Dataverse URL.'}</p>
+              <div class="alert alert-secondary text-start overflow-auto" style="max-height: 200px;">
+                <small>${error.response ? 'Response: ' + JSON.stringify(error.response.data, null, 2) : 'Check server console for more details.'}</small>
+              </div>
+              <a href="/" class="btn btn-primary mt-3">Back to Home</a>
+            </div>
+          </div>
+        </main>
+      </body>
+      </html>
+    `);
   }
 });
 
@@ -425,7 +679,7 @@ async function convertEdmxToOpenApi(edmxMetadata, baseUrl) {
         const entityType = entitySets.$.EntityType.split('.').pop();
         
         // Similar implementation as above for the single entity set
-        // (code omitted for brevity but would follow the same pattern)
+        // Code for single entity set would go here
       }
       
       console.log("Successfully generated OpenAPI specification");
@@ -467,12 +721,6 @@ async function convertEdmxToOpenApi(edmxMetadata, baseUrl) {
   }
 }
 
-// Create a public directory for static files
-const publicDir = path.join(__dirname, 'public');
-if (!fs.existsSync(publicDir)) {
-  fs.mkdirSync(publicDir);
-}
-
 // Custom Swagger setup to avoid MIME type issues
 // First create a JSON specification file
 app.get('/swagger.json', (req, res) => {
@@ -511,9 +759,45 @@ const swaggerHtml = `
     *, *:before, *:after { box-sizing: inherit; }
     body { margin: 0; padding: 0; }
     .swagger-ui .topbar { display: none; }
+    
+    /* Custom navbar */
+    .api-navbar {
+      background-color: #007bff;
+      padding: 1rem;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .api-navbar a {
+      color: white;
+      text-decoration: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+    }
+    .api-navbar a:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    .api-logo {
+      height: 30px;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
   </style>
 </head>
 <body>
+  <!-- Custom navbar above Swagger UI -->
+  <div class="api-navbar">
+    <div>
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Power_Apps_logo.svg/1200px-Power_Apps_logo.svg.png" alt="Dataverse Logo" class="api-logo">
+      <span>Dataverse API Documentation</span>
+    </div>
+    <div>
+      <a href="/">Home</a>
+      <a href="/auth/logout">Sign Out</a>
+    </div>
+  </div>
+
   <div id="swagger-ui"></div>
 
   <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
@@ -570,28 +854,121 @@ app.use(express.static(publicDir));
 
 // API docs route
 app.get('/api-docs', (req, res) => {
-  if (!openApiSpec) {
-    return res.send("No API documentation available yet. Please go back and generate docs first.");
-  }
-  res.sendFile(path.join(publicDir, 'index.html'));
+if (!openApiSpec) {
+    return res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>No Documentation - Dataverse API Explorer</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+            html, body {
+            height: 100%;
+            }
+            
+            body {
+            display: flex;
+            align-items: center;
+            padding-top: 40px;
+            padding-bottom: 40px;
+            background-color: #f5f5f5;
+            }
+            
+            .container {
+            width: 100%;
+            max-width: 600px;
+            padding: 15px;
+            margin: auto;
+            text-align: center;
+            }
+        </style>
+        </head>
+        <body>
+        <main class="container">
+            <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">No API Documentation Available</h5>
+                <p class="card-text">Please generate documentation first.</p>
+                <a href="/" class="btn btn-primary">Go Back</a>
+            </div>
+            </div>
+        </main>
+        </body>
+        </html>
+    `);
+    }
+    res.sendFile(path.join(publicDir, 'index.html'));
 });
 
 // Conventional approach with swagger-ui-express as fallback
 app.use('/swagger-ui', swaggerUi.serve);
 app.get('/swagger-ui', (req, res) => {
-  if (!openApiSpec) {
-    return res.send("No API documentation available. Please generate docs first.");
-  }
-  
-  // Setup Swagger UI as normal
-  swaggerUi.setup(openApiSpec, {
+    if (!openApiSpec) {
+    return res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>No Documentation - Dataverse API Explorer</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+            html, body {
+            height: 100%;
+            }
+            
+            body {
+            display: flex;
+            align-items: center;
+            padding-top: 40px;
+            padding-bottom: 40px;
+            background-color: #f5f5f5;
+            }
+            
+            .container {
+            width: 100%;
+            max-width: 600px;
+            padding: 15px;
+            margin: auto;
+            text-align: center;
+            }
+        </style>
+        </head>
+        <body>
+        <main class="container">
+            <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">No API Documentation Available</h5>
+                <p class="card-text">Please generate documentation first.</p>
+                <a href="/" class="btn btn-primary">Go Back</a>
+            </div>
+            </div>
+        </main>
+        </body>
+        </html>
+    `);
+    }
+    
+    // Setup Swagger UI as normal
+    swaggerUi.setup(openApiSpec, {
     explorer: true
-  })(req, res);
+    })(req, res);
 });
 
 // Start the application.
 const port = 3000;
 app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-  console.log(`Environment loaded - Using Dataverse URL: ${process.env.dataverse_url || 'Not set'}`);
+    console.log(`
+╔════════════════════════════════════════════╗
+║  Dataverse API Explorer                    ║
+║  Server running on http://localhost:${port}     ║
+║                                            ║
+║  Environment:                              ║
+║  - Dataverse URL: ${process.env.dataverse_url ? 'Configured ✓' : 'Not set ✗'}           ║
+║  - Client Secret: ${process.env.client_secret ? 'Configured ✓' : 'Not set ✗'}           ║
+║  - Session Secret: ${process.env.session_secret ? 'Configured ✓' : 'Not set ✗'}         ║
+╚════════════════════════════════════════════╝
+    `);
 });
