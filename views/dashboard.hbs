@@ -1,0 +1,73 @@
+<div class="dashboard-container">
+  <img class="brand-logo" src="/images/logo.png" alt="Dataverse Logo">
+  <h1 class="h3 mb-3 fw-normal">Generate API Documentation</h1>
+  
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title mb-3">Enter Your Dataverse Environment URL</h5>
+      <form method="POST" action="/api/generate-docs" class="p-2">
+        <div class="form-floating mb-3">
+          <input type="text" class="form-control" id="envUrl" name="envUrl" 
+                 placeholder="https://your-org.api.crm.dynamics.com/api/data/v9.2/" 
+                 value="{{dataverseUrl}}" required>
+          <label for="envUrl">Dataverse Environment URL</label>
+        </div>
+        <div class="mb-3">
+          <button type="button" id="loadPublishers" class="btn btn-outline-secondary mb-2">Load Publishers</button>
+          <select class="form-select" id="publisher" name="publisher">
+            <option value="">All Publishers (No Filter)</option>
+            {{#if publisher}}
+            <option value="{{publisher}}" selected>{{publisher}}</option>
+            {{/if}}
+          </select>
+          <div class="form-text">Filter tables by publisher</div>
+        </div>
+        <button class="w-100 btn btn-lg btn-primary" type="submit">Generate API Docs</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('loadPublishers').addEventListener('click', async function() {
+      const envUrl = document.getElementById('envUrl').value;
+      if (!envUrl) {
+        alert('Please enter a Dataverse Environment URL first');
+        return;
+      }
+      
+      this.textContent = 'Loading...';
+      this.disabled = true;
+      
+      try {
+        const response = await fetch('/api/fetch-publishers?url=' + encodeURIComponent(envUrl));
+        if (!response.ok) {
+          throw new Error('Failed to load publishers');
+        }
+        
+        const publisherSelect = document.getElementById('publisher');
+        // Keep the first option (All Publishers)
+        const firstOption = publisherSelect.options[0];
+        publisherSelect.innerHTML = '';
+        publisherSelect.appendChild(firstOption);
+        
+        const data = await response.json();
+        data.publishers.forEach(pub => {
+          const option = document.createElement('option');
+          option.value = pub.uniquename;
+          option.textContent = pub.friendlyname || pub.uniquename;
+          publisherSelect.appendChild(option);
+        });
+        
+        this.textContent = 'Publishers Loaded';
+      } catch (error) {
+        console.error('Error loading publishers:', error);
+        alert('Error loading publishers: ' + error.message);
+        this.textContent = 'Load Publishers';
+      } finally {
+        this.disabled = false;
+      }
+    });
+  });
+</script>

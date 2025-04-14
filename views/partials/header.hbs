@@ -1,0 +1,16 @@
+<header>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="/">
+        <img src="/images/logo.png" alt="Dataverse Logo" class="header-logo">
+        Dataverse API Explorer
+      </a>
+      
+      {{#if isAuthenticated}}
+      <div class="navbar-nav ms-auto">
+        <a class="nav-link" href="/auth/logout">Sign Out</a>
+      </div>
+      {{/if}}
+    </div>
+  </nav>
+</header>

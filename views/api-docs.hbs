@@ -1,0 +1,14 @@
+{{!-- This template integrates Swagger UI --}}
+<link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
+
+{{#if selectedPublisher}}
+<div class="publisher-filter">
+  <strong>Publisher filter applied:</strong> {{selectedPublisher}}
+</div>
+{{/if}}
+
+<div id="swagger-ui"></div>
+
+<script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+<script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
+<script src="/js/swagger-ui.js"></script>
