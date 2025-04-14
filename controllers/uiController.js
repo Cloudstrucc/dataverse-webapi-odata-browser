@@ -16,7 +16,7 @@ router.get('/', (req, res) => {
     res.render('dashboard', {
       title: 'Dataverse API Explorer - Dashboard',
       dataverseUrl: process.env.dataverse_url || '',
-      publisher: process.env.publisher || '',
+      prefix: process.env.prefix || '',
       isAuthenticated: !!req.session.token
     });
   }
@@ -36,7 +36,7 @@ router.get('/api-docs', (req, res) => {
   res.render('api-docs', {
     title: 'Dataverse API Documentation',
     isAuthenticated: !!req.session.token,
-    selectedPublisher: req.session.selectedPublisher || 'None'
+    prefix: req.session.prefix || 'None'
   });
 });
 

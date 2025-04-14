@@ -23,19 +23,19 @@ router.post('/generate-docs', async (req, res) => {
   // Use the form-submitted URL or fall back to .env value
   const envUrl = req.body.envUrl || process.env.dataverse_url;
   
-  // Get the selected publisher for filtering
-  const selectedPublisher = req.body.publisher || process.env.publisher;
+  // Get the entity name prefix for filtering (if provided)
+  const prefix = req.body.prefix || process.env.prefix || '';
   
   // Store the values in the session for later use
   req.session.baseApiUrl = envUrl;
-  req.session.selectedPublisher = selectedPublisher;
+  req.session.prefix = prefix;
   
   // Render loading page
   res.render('loading', {
     title: 'Generating Documentation',
     dataverseUrl: envUrl,
-    selectedPublisher: selectedPublisher,
-    redirectUrl: `/api/process-metadata?url=${encodeURIComponent(envUrl)}&publisher=${encodeURIComponent(selectedPublisher || '')}`
+    prefix: prefix,
+    redirectUrl: `/api/process-metadata?url=${encodeURIComponent(envUrl)}&prefix=${encodeURIComponent(prefix || '')}`
   });
 });
 
@@ -51,45 +51,61 @@ router.get('/process-metadata', async (req, res) => {
   }
 
   const envUrl = req.query.url;
-  const selectedPublisher = req.query.publisher;
+  const prefix = req.query.prefix;
   
   // Store these values in session for later use
   req.session.baseApiUrl = envUrl;
-  req.session.selectedPublisher = selectedPublisher;
+  req.session.prefix = prefix;
   
   try {
-    // Fetch metadata
-    const metadata = await dataverseService.fetchMetadata(envUrl, req.session.token);
+    // Normalize the Dataverse URL to ensure it's in a consistent format
+    const normalizedUrl = dataverseService.normalizeDataverseUrl(envUrl);
+    console.log(`Processing metadata for URL: ${normalizedUrl}, Prefix Filter: ${prefix || 'None'}`);
     
-    // If publisher filter is selected, fetch entity information
-    let entityPublisherMap = new Map();
-    
-    if (selectedPublisher) {
-      try {
-        entityPublisherMap = await dataverseService.fetchEntityPublisherMap(
-          envUrl, 
-          req.session.token, 
-          selectedPublisher
-        );
-      } catch (error) {
-        console.error('Error fetching entity publisher information:', error.message);
-        // Continue without publisher filtering if this fails
-      }
+    // Fetch metadata (with error handling)
+    let metadata;
+    try {
+      metadata = await dataverseService.fetchMetadata(envUrl, req.session.token);
+      console.log("Successfully fetched metadata, size:", metadata.length);
+    } catch (metadataError) {
+      console.error("Error fetching metadata:", metadataError.message);
+      throw new Error(`Failed to fetch metadata: ${metadataError.message}`);
     }
 
     // Convert the EDMX metadata to an OpenAPI specification
-    openApiSpec = await metadataService.convertEdmxToOpenApi(
-      metadata, 
-      envUrl, 
-      selectedPublisher, 
-      entityPublisherMap
-    );
+    try {
+      console.log("Converting EDMX to OpenAPI with prefix filter:", prefix);
+      openApiSpec = await metadataService.convertEdmxToOpenApi(
+        metadata, 
+        normalizedUrl,
+        prefix
+      );
+      
+      // Validate the generated spec
+      if (!openApiSpec || !openApiSpec.paths) {
+        throw new Error("Generated OpenAPI specification is invalid or empty");
+      }
+      
+      console.log(`Generated OpenAPI spec with ${Object.keys(openApiSpec.paths).length} paths`);
+    } catch (conversionError) {
+      console.error("Error converting metadata to OpenAPI:", conversionError.message);
+      throw new Error(`Failed to convert metadata: ${conversionError.message}`);
+    }
 
     // Create a file with the OpenAPI spec for debugging
-    const tempDir = path.join(__dirname, '../temp');
-    const specPath = path.join(tempDir, 'openapi-spec.json');
-    fs.writeFileSync(specPath, JSON.stringify(openApiSpec, null, 2));
-    console.log(`OpenAPI spec saved to ${specPath}`);
+    try {
+      const tempDir = path.join(__dirname, '../temp');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      
+      const specPath = path.join(tempDir, 'openapi-spec.json');
+      fs.writeFileSync(specPath, JSON.stringify(openApiSpec, null, 2));
+      console.log(`OpenAPI spec saved to ${specPath}`);
+    } catch (fileError) {
+      console.error("Error saving OpenAPI spec file:", fileError.message);
+      // Don't fail the whole operation for this, just log it
+    }
 
     // Set a flag in the session to indicate that OpenAPI spec has been generated
     req.session.openApiGenerated = true;
@@ -98,41 +114,22 @@ router.get('/process-metadata', async (req, res) => {
     res.redirect('/api-docs');
   } catch (error) {
     console.error('Error processing metadata:', error.message);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', typeof error.response.data === 'object' 
+        ? JSON.stringify(error.response.data) 
+        : error.response.data);
+    }
     
     res.status(500).render('error', {
       title: 'Processing Error',
       message: 'Error generating API documentation',
       details: error.message,
-      responseData: error.response ? JSON.stringify(error.response.data, null, 2) : null,
+      responseData: error.response ? 
+        (typeof error.response.data === 'object' ? JSON.stringify(error.response.data) : error.response.data) 
+        : null,
       redirectUrl: '/',
       redirectText: 'Back to Home'
-    });
-  }
-});
-
-// Fetch publishers from Dataverse
-router.get('/fetch-publishers', async (req, res) => {
-  if (!req.session.token) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
-  const envUrl = req.query.url;
-  if (!envUrl) {
-    return res.status(400).json({ error: 'Dataverse URL is required' });
-  }
-  
-  try {
-    const publishers = await dataverseService.fetchPublishers(envUrl, req.session.token);
-    res.json({ publishers });
-  } catch (error) {
-    console.error('Error fetching publishers:', error.message);
-    res.status(500).json({ 
-      error: 'Failed to fetch publishers',
-      details: error.message,
-      response: error.response ? {
-        status: error.response.status,
-        data: error.response.data
-      } : null
     });
   }
 });
@@ -143,29 +140,80 @@ router.get('/swagger.json', (req, res) => {
     return res.status(404).json({ error: "No API specification available" });
   }
   
-  // Add security definitions if needed
-  if (!openApiSpec.components) {
-    openApiSpec.components = {};
+  try {
+    // Handle the "Components object is deprecated" warning by restructuring the spec
+    const transformedSpec = transformSpecForSwaggerUI(openApiSpec);
+    res.json(transformedSpec);
+  } catch (error) {
+    console.error("Error transforming OpenAPI spec:", error);
+    res.status(500).json({ 
+      error: "Error processing OpenAPI specification",
+      details: error.message
+    });
   }
-  
-  if (!openApiSpec.components.securitySchemes) {
-    openApiSpec.components.securitySchemes = {
-      bearerAuth: {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT'
-      }
-    };
-  }
-  
-  res.json(openApiSpec);
 });
+
+/**
+ * Transform the OpenAPI spec to handle schemas correctly for Swagger UI
+ * @param {Object} spec - Original OpenAPI specification
+ * @returns {Object} - Transformed specification
+ */
+function transformSpecForSwaggerUI(spec) {
+  try {
+    // Create a deep copy to avoid modifying the original
+    const transformedSpec = JSON.parse(JSON.stringify(spec));
+    
+    // If there are schemas at the root level, move them to components.schemas
+    if (transformedSpec.schemas && !transformedSpec.components) {
+      transformedSpec.components = { schemas: transformedSpec.schemas };
+      delete transformedSpec.schemas;
+    } else if (transformedSpec.schemas && transformedSpec.components) {
+      transformedSpec.components.schemas = transformedSpec.schemas;
+      delete transformedSpec.schemas;
+    }
+    
+    // Add security schemes if needed
+    if (!transformedSpec.components) {
+      transformedSpec.components = {};
+    }
+    
+    if (!transformedSpec.components.securitySchemes) {
+      transformedSpec.components.securitySchemes = {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT'
+        }
+      };
+    }
+    
+    // Fix any $ref paths that point to #/schemas instead of #/components/schemas
+    const fixRefs = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      
+      Object.keys(obj).forEach(key => {
+        if (key === '$ref' && typeof obj[key] === 'string') {
+          // Replace #/schemas/ with #/components/schemas/
+          obj[key] = obj[key].replace('#/schemas/', '#/components/schemas/');
+        } else if (typeof obj[key] === 'object') {
+          fixRefs(obj[key]);
+        }
+      });
+    };
+    
+    fixRefs(transformedSpec);
+    return transformedSpec;
+  } catch (error) {
+    console.error('Error transforming spec:', error);
+    return spec; // Return original if transformation fails
+  }
+}
 
 // Provide token to frontend
 router.get('/token', (req, res) => {
   res.json({ 
     token: req.session.token || null,
-    publisher: req.session.selectedPublisher || null
+    prefix: req.session.prefix || null
   });
 });
 
