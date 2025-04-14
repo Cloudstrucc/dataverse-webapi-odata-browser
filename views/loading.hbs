@@ -1,0 +1,17 @@
+<div class="loading-container">
+  <div class="spinner-border text-primary" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+  <h1 class="h3 mb-3 fw-normal">Generating API Documentation</h1>
+  <p class="text-muted">Fetching metadata from Dataverse and processing...</p>
+  
+  {{#if prefix}}
+  <p class="badge bg-info">Filtering by prefix: {{prefix}}</p>
+  {{/if}}
+  
+  <div class="progress mt-4">
+    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+  </div>
+</div>
+
+<meta http-equiv="refresh" content="2;url={{redirectUrl}}" />

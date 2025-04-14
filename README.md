@@ -2,6 +2,55 @@
 
 This application generates interactive OpenAPI documentation for Microsoft Dataverse environments using the OData metadata endpoint.
 
+## Project structure
+
+dataverse-webapi-odata-browser/
+│
+├── .env                      # Environment variables configuration
+├── package.json             # Project metadata and dependencies
+├── server.js                # Main application entry point
+│
+├── config/                  # Configuration files
+│   └── azureConfig.js       # Azure AD configuration
+│
+├── controllers/             # Route controllers
+│   ├── authController.js    # Authentication-related routes
+│   ├── apiController.js     # API documentation routes
+│   └── uiController.js      # Main UI routes
+│
+├── middleware/              # Express middleware
+│   └── authMiddleware.js    # Authentication middleware
+│
+├── public/                  # Static assets
+│   ├── css/
+│   │   └── styles.css       # Main stylesheet
+│   ├── js/
+│   │   ├── main.js          # Main JavaScript file
+│   │   └── swagger-ui.js    # Swagger UI initialization script
+│   └── images/
+│       └── logo.png         # App logo
+│
+├── services/                # Business logic services
+│   ├── dataverseService.js  # Dataverse API interaction
+│   └── metadataService.js   # Metadata conversion logic
+│
+├── utils/                   # Utility functions
+│   └── edmxConverter.js     # EDMX to OpenAPI conversion
+│
+├── views/                   # Handlebars templates
+│   ├── layouts/
+│   │   └── main.hbs         # Main layout template
+│   ├── partials/
+│   │   ├── header.hbs       # Header partial
+│   │   └── footer.hbs       # Footer partial
+│   ├── index.hbs            # Home page (login)
+│   ├── dashboard.hbs        # API configuration page
+│   ├── loading.hbs          # Processing indicator
+│   └── error.hbs            # Error page
+│
+└── temp/                    # Temporary files (gitignored)
+    └── openapi-spec.json    # Generated OpenAPI specification
+
 ## Setup Instructions
 
 1. Clone or download this repository
@@ -71,7 +120,6 @@ You can modify the `convertEdmxToOpenApi` function in `server.js` to customize h
 ## Security Note
 
 This application includes Azure AD client credentials in the code for demonstration purposes. In a production environment, store these credentials securely using environment variables or a secret management service.
-
 
 ## Deployment to Digital Ocean VM (Ubuntu 22 & nginx)
 

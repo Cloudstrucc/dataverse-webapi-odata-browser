@@ -1,0 +1,18 @@
+<div class="login-container">
+  <img class="brand-logo" src="/images/logo.png" alt="Dataverse Logo">
+  <h1 class="h3 mb-3 fw-normal">Dataverse API Explorer</h1>
+  <p class="mb-3 text-muted">Access documentation for your Dataverse environment APIs</p>
+  
+  <div class="card p-3 bg-light">
+    <form method="POST" action="/auth/set-tenant" class="text-start mb-3">
+      <div class="form-floating mb-3">
+        <input type="text" class="form-control" id="tenantId" name="tenantId" 
+               placeholder="00000000-0000-0000-0000-000000000000" 
+               value="{{tenantId}}">
+        <label for="tenantId">Azure AD Tenant ID (Optional)</label>
+      </div>
+      <button type="submit" class="w-100 btn btn-secondary">Set Tenant ID</button>
+    </form>
+    <a href="/auth/login" class="w-100 btn btn-lg btn-primary signin-btn">Sign in with Microsoft</a>
+  </div>
+</div>

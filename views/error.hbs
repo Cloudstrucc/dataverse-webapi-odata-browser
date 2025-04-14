@@ -1,0 +1,25 @@
+<div class="error-container">
+  <div class="card text-center border-danger">
+    <div class="card-header bg-danger text-white">
+      <h4 class="my-0">Error</h4>
+    </div>
+    <div class="card-body">
+      <h5 class="card-title">{{title}}</h5>
+      <p class="card-text">{{message}}</p>
+      
+      {{#if details}}
+      <div class="alert alert-secondary text-start overflow-auto" style="max-height: 200px;">
+        <small>{{details}}</small>
+      </div>
+      {{/if}}
+      
+      {{#if responseData}}
+      <div class="alert alert-secondary text-start overflow-auto" style="max-height: 200px;">
+        <small>Response: {{responseData}}</small>
+      </div>
+      {{/if}}
+      
+      <a href="{{redirectUrl}}" class="btn btn-primary mt-3">{{redirectText}}</a>
+    </div>
+  </div>
+</div>
