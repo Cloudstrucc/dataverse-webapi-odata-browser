@@ -1,280 +1,181 @@
-# Dataverse API Documentation Generator
 
-This application generates interactive OpenAPI documentation for Microsoft Dataverse environments using the OData metadata endpoint.
+# 🚀 Dataverse API Explorer
 
-## Project structure
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/Node.js-16.x-green.svg)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-4.x-lightgrey.svg)](https://expressjs.com/)
 
-dataverse-webapi-odata-browser/
-│
-├── .env                      # Environment variables configuration
-├── package.json             # Project metadata and dependencies
-├── server.js                # Main application entry point
-│
-├── config/                  # Configuration files
-│   └── azureConfig.js       # Azure AD configuration
-│
-├── controllers/             # Route controllers
-│   ├── authController.js    # Authentication-related routes
-│   ├── apiController.js     # API documentation routes
-│   └── uiController.js      # Main UI routes
-│
-├── middleware/              # Express middleware
-│   └── authMiddleware.js    # Authentication middleware
-│
-├── public/                  # Static assets
-│   ├── css/
-│   │   └── styles.css       # Main stylesheet
-│   ├── js/
-│   │   ├── main.js          # Main JavaScript file
-│   │   └── swagger-ui.js    # Swagger UI initialization script
-│   └── images/
-│       └── logo.png         # App logo
-│
-├── services/                # Business logic services
-│   ├── dataverseService.js  # Dataverse API interaction
-│   └── metadataService.js   # Metadata conversion logic
-│
-├── utils/                   # Utility functions
-│   └── edmxConverter.js     # EDMX to OpenAPI conversion
-│
-├── views/                   # Handlebars templates
-│   ├── layouts/
-│   │   └── main.hbs         # Main layout template
-│   ├── partials/
-│   │   ├── header.hbs       # Header partial
-│   │   └── footer.hbs       # Footer partial
-│   ├── index.hbs            # Home page (login)
-│   ├── dashboard.hbs        # API configuration page
-│   ├── loading.hbs          # Processing indicator
-│   └── error.hbs            # Error page
-│
-└── temp/                    # Temporary files (gitignored)
-    └── openapi-spec.json    # Generated OpenAPI specification
+A powerful tool to explore and document your Microsoft Dataverse APIs with customizable filtering by publisher prefixes.
 
-## Setup Instructions
+## ✨ Features
 
-1. Clone or download this repository
-2. Install dependencies:
+* 📚  **Interactive API Documentation** : Generate Swagger UI documentation for your Dataverse environment
+* 🔍  **Publisher Filtering** : Filter entities by publisher with an easy-to-use dropdown
+* 🔐  **Azure AD Authentication** : Secure access to your Dataverse environment
+* 🔄  **Customizable Tenant** : Set different Azure AD tenants for different environments
+* 📱  **Responsive Design** : Works on desktop and mobile devices
+
+## 📋 Prerequisites
+
+* [Node.js](https://nodejs.org/) (v14 or newer)
+* Access to a Microsoft Dataverse environment
+* Azure AD application with proper permissions
+
+## 🔧 Setup & Configuration
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Cloudstrucc/dataverse-webapi-odata-browser.git
+cd dataverse-webapi-odata-browser
+```
+
+### 2. Install dependencies
 
 ```bash
 npm install
 ```
 
-3. Create a `temp` directory in the project root:
+### 3. Set up Azure AD Application
 
-```bash
-mkdir temp
+1. Go to the [Azure Portal](https://portal.azure.com)
+2. Navigate to **Azure Active Directory** → **App registrations** → **New registration**
+3. Fill in the required information:
+   * **Name** : Dataverse API Explorer
+   * **Supported account types** : Accounts in this organizational directory only
+   * **Redirect URI** : Web - http://localhost:3000/auth/callback
+4. Click **Register**
+5. Make note of the **Application (client) ID** and **Directory (tenant) ID**
+6. Go to **Certificates & secrets** → **New client secret**
+7. Create a new secret and copy its **Value** (you won't be able to see it again)
+8. Go to **API Permissions** → **Add a permission** → **Dynamics CRM** → **Delegated permissions**
+9. Select `user_impersonation` and click **Add permissions**
+10. Click **Grant admin consent for [your tenant]**
+
+### 4. Configure the .env file
+
+Create a `.env` file in the root of the project with the following content:
+
+```
+# Azure AD Configuration
+client_secret="YOUR_CLIENT_SECRET"
+tenant_id="YOUR_TENANT_ID"
+
+# Application Configuration
+session_secret="RANDOM_SESSION_SECRET"
+
+# Dataverse Configuration
+dataverse_url="https://your-org.crm.dynamics.com/"
 ```
 
-4. Start the server:
+Replace the placeholders with your actual values:
+
+* `YOUR_CLIENT_SECRET`: The client secret from Azure AD
+* `YOUR_TENANT_ID`: The tenant ID from Azure AD
+* `RANDOM_SESSION_SECRET`: A random string for session security
+* `https://your-org.crm.dynamics.com/`: Your Dataverse environment URL
+
+### 5. Start the application
 
 ```bash
 npm start
 ```
 
-5. Open your browser and navigate to: `http://localhost:3000`
+The application will be available at http://localhost:3000.
 
-## How It Works
+## 📘 Usage Guide
 
-1. Sign in with your Azure AD credentials
-2. Enter your Dataverse environment URL (e.g., `https://your-org.api.crm.dynamics.com/api/data/v9.2/`)
-3. The application will:
-   * Fetch the OData metadata from your Dataverse environment
-   * Convert the EDMX XML metadata to an OpenAPI specification
-   * Display interactive API documentation using Swagger UI
+### Signing In
 
-## Features
+1. Open http://localhost:3000 in your browser
+2. (Optional) Set a different Azure AD tenant ID if needed
+3. Click **Sign in with Microsoft**
+4. Complete the authentication process
 
-* **Azure AD Authentication** : Securely authenticates with your Dynamics 365/Dataverse environment
-* **Automatic Metadata Processing** : Converts EDMX metadata to OpenAPI format
-* **Interactive Documentation** : Explore and test your Dataverse APIs with Swagger UI
-* **Bearer Token Integration** : Automatically includes your authentication token for API testing
+### Generating API Documentation
 
-## Troubleshooting
+1. Enter your Dataverse environment URL (e.g., `https://your-org.crm3.dynamics.com/`)
+2. Click **Load Publishers** to fetch available publishers from your environment
+3. Select a publisher from the dropdown to filter entities by that publisher's prefix
+4. Click **Generate API Docs** to create the Swagger UI documentation
+5. Browse the generated documentation to explore your Dataverse APIs
 
-### JSON Metadata Format Not Supported
+### Using the API Documentation
 
-If you encounter an error mentioning "JSON metadata is not supported", this is normal. The application explicitly requests XML format to handle this issue.
+* **Entity Lists** : Browse all entities filtered by the selected publisher
+* **Operations** : See all available operations (GET, POST, PATCH, DELETE) for each entity
+* **Parameters** : View and test query parameters like $select, $filter, $top
+* **Schemas** : Explore the data structure of each entity
 
-### Schema Processing Issues
+## 🔄 Environment Variables
 
-If entity sets or types aren't correctly displayed, check the server logs for details on the XML parsing process. The application attempts to handle both single and multiple entity scenarios.
+| Variable           | Description                        | Example                                      |
+| ------------------ | ---------------------------------- | -------------------------------------------- |
+| `client_secret`  | Azure AD application client secret | `W7q8Q~BXbEk_iShmXXgxIcdTYqcVNJa4gCKAHaSP` |
+| `tenant_id`      | Azure AD tenant ID                 | `24a46daa-7b87-4566-9eea-281326a1b75c`     |
+| `session_secret` | Secret for session encryption      | `my-super-secret-key-12345`                |
+| `dataverse_url`  | Default Dataverse environment URL  | `https://org.crm.dynamics.com/`            |
 
-### Authentication Errors
+## 📝 Examples
 
-If you encounter authentication errors, verify:
+### Basic Usage
 
-* Your Azure AD app registration has the correct permissions
-* The redirect URI matches your local server
-* The client ID and secret are correct
+1. Sign in with your Microsoft account
+2. Enter your Dataverse URL: `https://contoso.crm.dynamics.com/`
+3. Load publishers and select "Contoso Sales"
+4. Generate API documentation
+5. Explore the entities with the "contoso_" prefix
 
-## Customization
+### Different Tenant
 
-You can modify the `convertEdmxToOpenApi` function in `server.js` to customize how the OpenAPI specification is generated. The current implementation:
+1. Enter tenant ID: `contoso-tenant-id`
+2. Sign in with your Microsoft account
+3. Enter your Dataverse URL: `https://contoso-test.crm.dynamics.com/`
+4. Load publishers and select "Contoso Marketing"
+5. Generate API documentation
+6. Explore the entities with the "contosomarketing_" prefix
 
-1. Parses the EDMX XML metadata
-2. Extracts entity types and sets information
-3. Converts EDM types to OpenAPI types
-4. Generates paths for basic CRUD operations on each entity
+## 🛠️ Troubleshooting
 
-## Security Note
+### Authentication Issues
 
-This application includes Azure AD client credentials in the code for demonstration purposes. In a production environment, store these credentials securely using environment variables or a secret management service.
+* Ensure your Azure AD app has the correct redirect URI
+* Verify the client secret hasn't expired
+* Check that your account has access to the Dataverse environment
 
-## Deployment to Digital Ocean VM (Ubuntu 22 & nginx)
+### API Document Generation Issues
 
-1. Clone the repository on your VM
-2. Install dependencies and build the app
-3. Set up the app to run on a new port (3002)
-4. Configure Nginx as a reverse proxy
-5. Set up the subdomain in Namecheap DNS
-6. Obtain SSL certificate with Let's Encrypt
-7. Configure the app to run as a service
+* Confirm the Dataverse URL is correct
+* Ensure your account has sufficient permissions in Dataverse
+* Check the publisher prefix is valid if filtering is applied
 
-Let's get started with the detailed instructions:
+### Network Errors
 
-### 1. Clone the Repository and Prepare the App
+* Verify your network connection
+* Check if your organization restricts access to Dataverse APIs
+* Ensure no firewall is blocking the connections
 
-```bash
-# SSH into your VM
-ssh your-username@your-vm-ip
+## 🤝 Contributing
 
-# Clone the repository
-cd /opt
-sudo mkdir dataverse-webapi-browser
-sudo chown $USER:$USER dataverse-webapi-browser
-cd dataverse-webapi-browser
-git clone https://github.com/Cloudstrucc/dataverse-webapi-odata-browser .
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-# Install dependencies
-npm install
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-# Build the app (if it's a React/Vue/Angular app)
-npm run build
-```
+## 📜 License
 
-### 2. Configure the App to Run on Port 3002
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-Since you already have apps running on ports 3000 and 3001, let's set this one up on port 3002. You'll need to modify the port in your app's configuration.
+## 🙏 Acknowledgements
 
-If the repository contains a server.js or index.js file, look for where the port is defined and change it to 3002. If it's using environment variables, you can set them in a .env file:
+* [Microsoft Dataverse](https://docs.microsoft.com/en-us/powerapps/maker/data-platform/data-platform-intro)
+* [Swagger UI](https://swagger.io/tools/swagger-ui/)
+* [Express.js](https://expressjs.com/)
+* [Bootstrap](https://getbootstrap.com/)
 
-```bash
-# Create .env file
-echo "PORT=3002" > .env
-```
+---
 
-### 3. Set Up Nginx as Reverse Proxy
-
-```bash
-# Install Nginx if not already installed
-sudo apt update
-sudo apt install nginx -y
-
-# Create Nginx configuration file
-sudo nano /etc/nginx/sites-available/dataverse-webapi-browser.conf
-```
-
-Add this configuration:
-
-```nginx
-server {
-    listen 80;
-    server_name dataverse-webapi-browser.yourdomain.com;
-
-    location / {
-        proxy_pass http://localhost:3002;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-Enable the configuration:
-
-```bash
-sudo ln -s /etc/nginx/sites-available/dataverse-webapi-browser.conf /etc/nginx/sites-enabled/
-sudo nginx -t  # Test the configuration
-sudo systemctl reload nginx
-```
-
-### 4. Set Up the Subdomain in Namecheap DNS
-
-1. Log into your Namecheap account
-2. Go to "Domain List" and click "Manage" next to your domain
-3. Select the "Advanced DNS" tab
-4. Add a new A Record:
-   * Host: `dataverse-webapi-browser`
-   * Value: Your DigitalOcean VM's IP address
-   * TTL: Automatic
-
-### 5. Obtain SSL Certificate with Let's Encrypt
-
-```bash
-# Install Certbot if not already installed
-sudo apt install certbot python3-certbot-nginx -y
-
-# Obtain SSL certificate
-sudo certbot --nginx -d dataverse-webapi-browser.yourdomain.com
-```
-
-Follow the prompts. Certbot will automatically update your Nginx configuration to use HTTPS.
-
-### 6. Set Up the App as a Service
-
-This will ensure your app starts automatically when the server restarts:
-
-```bash
-sudo nano /etc/systemd/system/dataverse-webapi-browser.service
-```
-
-Add this configuration:
-
-```ini
-[Unit]
-Description=Dataverse WebAPI OData Browser
-After=network.target
-
-[Service]
-Type=simple
-User=your-username
-WorkingDirectory=/opt/dataverse-webapi-browser
-ExecStart=/usr/bin/npm start
-Restart=on-failure
-Environment=PORT=3002
-Environment=NODE_ENV=production
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start the service:
-
-```bash
-sudo systemctl enable dataverse-webapi-browser
-sudo systemctl start dataverse-webapi-browser
-sudo systemctl status dataverse-webapi-browser
-```
-
-### 7. Monitor and Test
-
-Check if your application is running correctly:
-
-```bash
-# Check the status of your service
-sudo systemctl status dataverse-webapi-browser
-
-# Check the logs if there are issues
-sudo journalctl -u dataverse-webapi-browser
-```
-
-Visit https://dataverse-webapi-browser.yourdomain.com in your browser to ensure everything is working.
-
-### Additional Notes
-
-* You may need to adjust file paths and specific commands based on the structure of your repository.
-* Make sure your DigitalOcean firewall allows HTTP (port 80) and HTTPS (port 443) traffic.
-* The Let's Encrypt certificate will auto-renew through a cronjob that Certbot sets up.
+Developed with ❤️ by [Cloudstrucc](https://github.com/Cloudstrucc)
