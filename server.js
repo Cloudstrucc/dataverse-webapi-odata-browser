@@ -37,14 +37,14 @@ app.use(session({
 
 // Azure AD configuration
 const azureConfig = {
-  clientId: '66323902-24bb-43fa-8912-a311e6d73f2f',
-  tenantId: process.env.tenant_id || '24a46daa-7b87-4566-9eea-281326a1b75c',
+  clientId: process.env.client_id,
+  tenantId: process.env.tenant_id,
   get authority() {
     return `https://login.microsoftonline.com/${this.tenantId}`;
   },
   clientSecret: process.env.client_secret,
-  redirectUri: 'http://localhost:3000/auth/callback',
-  scopes: ['https://vcs-website-csdev.crm3.dynamics.com/.default']
+  redirectUri: process.env.redirectUri,
+  scopes: [process.env.scopes] // Convert string to array
 };
 
 // Initialize MSAL
@@ -53,8 +53,18 @@ let msalConfig = {
     clientId: azureConfig.clientId,
     authority: azureConfig.authority,
     clientSecret: azureConfig.clientSecret,
+  },
+  system: {
+    loggerOptions: {
+      loggerCallback(loglevel, message, containsPii) {
+        console.log(message);
+      },
+      piiLoggingEnabled: false,
+      logLevel: 3, // Error
+    }
   }
 };
+
 
 let cca = new msal.ConfidentialClientApplication(msalConfig);
 
@@ -375,6 +385,7 @@ app.get('/', (req, res) => {
 });
 
 // Set tenant ID
+// Set tenant ID
 app.post('/set-tenant', (req, res) => {
   const tenantId = req.body.tenantId.trim();
   
@@ -396,11 +407,14 @@ app.post('/set-tenant', (req, res) => {
 app.get('/auth/login', (req, res) => {
   // Log the login attempt
   console.log('Auth login route accessed');
+  console.log('Using redirect URI:', azureConfig.redirectUri);
   
   const authCodeUrlParameters = {
     scopes: azureConfig.scopes,
-    redirectUri: azureConfig.redirectUri,
+    redirectUri: azureConfig.redirectUri, // Make sure this is explicitly set
   };
+
+  console.log('Auth parameters:', JSON.stringify(authCodeUrlParameters, null, 2));
 
   cca.getAuthCodeUrl(authCodeUrlParameters)
     .then((response) => {
@@ -420,6 +434,7 @@ app.get('/auth/login', (req, res) => {
               <div class="alert alert-danger">
                 <h4>Authentication Error</h4>
                 <p>${error.message || 'Error during authentication'}</p>
+                <pre>${JSON.stringify(error, null, 2)}</pre>
                 <a href="/" class="btn btn-primary">Return to Home</a>
               </div>
             </div>
@@ -441,6 +456,12 @@ app.get('/auth/callback', (req, res) => {
   cca.acquireTokenByCode(tokenRequest)
     .then((response) => {
       console.log('Token acquired successfully');
+      console.log('='.repeat(80));
+      console.log('NEW BEARER TOKEN ACQUIRED:');
+      console.log('='.repeat(80));
+      console.log(response.accessToken);
+      console.log('='.repeat(80));
+      
       req.session.token = response.accessToken;
       
       // Store token expiration
@@ -448,6 +469,8 @@ app.get('/auth/callback', (req, res) => {
       req.session.tokenExpires = Date.now() + expiresIn;
       
       console.log(`Token will expire in ${Math.floor(expiresIn / 1000 / 60)} minutes`);
+      console.log(`Token expires at: ${new Date(req.session.tokenExpires).toISOString()}`);
+      console.log('='.repeat(80));
       
       // Redirect back to the dashboard
       res.redirect('/');
@@ -825,6 +848,165 @@ function createFallbackSpec(baseUrl, error) {
 }
 
 // API docs route
+// app.get('/api-docs', (req, res) => {
+//   if (!openApiSpec) {
+//     return res.send(`
+//       <!DOCTYPE html>
+//       <html lang="en">
+//       <head>
+//         <meta charset="utf-8">
+//         <meta name="viewport" content="width=device-width, initial-scale=1">
+//         <title>No Documentation - Dataverse API Explorer</title>
+//         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+//         <style>
+//           html, body {
+//             height: 100%;
+//           }
+          
+//           body {
+//             display: flex;
+//             align-items: center;
+//             padding-top: 40px;
+//             padding-bottom: 40px;
+//             background-color: #f5f5f5;
+//           }
+          
+//           .container {
+//             width: 100%;
+//             max-width: 600px;
+//             padding: 15px;
+//             margin: auto;
+//             text-align: center;
+//           }
+//         </style>
+//       </head>
+//       <body>
+//         <main class="container">
+//           <div class="card">
+//             <div class="card-body">
+//               <h5 class="card-title">No API Documentation Available</h5>
+//               <p class="card-text">Please generate documentation first.</p>
+//               <a href="/" class="btn btn-primary">Go Back</a>
+//             </div>
+//           </div>
+//         </main>
+//       </body>
+//       </html>
+//     `);
+//   }
+  
+//   // Create custom HTML page using CDN resources for Swagger UI
+//   const prefix = req.session.prefix || '';
+//   const swaggerHtml = `
+//     <!DOCTYPE html>
+//     <html lang="en">
+//     <head>
+//       <meta charset="UTF-8">
+//       <title>Dataverse API Documentation</title>
+//       <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
+//       <style>
+//         html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
+//         *, *:before, *:after { box-sizing: inherit; }
+//         body { margin: 0; padding: 0; }
+//         .swagger-ui .topbar { display: none; }
+        
+//         /* Custom navbar */
+//         .api-navbar {
+//           background-color: #007bff;
+//           padding: 1rem;
+//           color: white;
+//           display: flex;
+//           justify-content: space-between;
+//           align-items: center;
+//         }
+//         .api-navbar a {
+//           color: white;
+//           text-decoration: none;
+//           padding: 0.5rem 1rem;
+//           border-radius: 4px;
+//         }
+//         .api-navbar a:hover {
+//           background-color: rgba(255, 255, 255, 0.1);
+//         }
+//         .prefix-filter {
+//           background-color: #e9f7ff;
+//           padding: 0.75rem;
+//           margin-top: 0;
+//           border-bottom: 1px solid #ccc;
+//           font-size: 0.9rem;
+//         }
+//       </style>
+//     </head>
+//     <body>
+//       <!-- Custom navbar above Swagger UI -->
+//       <div class="api-navbar">
+//         <div>
+//           <span>Dataverse API Documentation</span>
+//         </div>
+//         <div>
+//           <a href="/">Home</a>
+//           <a href="/auth/logout">Sign Out</a>
+//         </div>
+//       </div>
+
+//       ${prefix ? `
+//       <!-- Prefix filter info -->
+//       <div class="prefix-filter">
+//         <strong>Entity prefix filter applied:</strong> ${prefix}
+//       </div>
+//       ` : ''}
+
+//       <div id="swagger-ui"></div>
+
+//       <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+//       <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
+//       <script>
+//         window.onload = function() {
+//           // Function to get the bearer token
+//           async function getToken() {
+//             try {
+//               const response = await fetch('/swagger.json');
+//               // Just use this request to ensure our session cookie is sent
+//               return null;
+//             } catch (error) {
+//               console.error('Error fetching token:', error);
+//               return null;
+//             }
+//           }
+
+//           // Initialize Swagger UI
+//           getToken().then(token => {
+//             const ui = SwaggerUIBundle({
+//               url: "/swagger.json",
+//               dom_id: '#swagger-ui',
+//               deepLinking: true,
+//               presets: [
+//                 SwaggerUIBundle.presets.apis,
+//                 SwaggerUIStandalonePreset
+//               ],
+//               layout: "StandaloneLayout",
+//               requestInterceptor: (req) => {
+//                 // Try to include auth header from session cookie
+//                 if (!req.headers) {
+//                   req.headers = {};
+//                 }
+//                 // Our session cookie will be automatically included
+//                 return req;
+//               }
+//             });
+            
+//             window.ui = ui;
+//           });
+//         }
+//       </script>
+//     </body>
+//     </html>
+//   `;
+
+//   res.send(swaggerHtml);
+// });
+
+// API docs route
 app.get('/api-docs', (req, res) => {
   if (!openApiSpec) {
     return res.send(`
@@ -912,9 +1094,66 @@ app.get('/api-docs', (req, res) => {
           border-bottom: 1px solid #ccc;
           font-size: 0.9rem;
         }
+        
+        /* Token helper styles */
+        .token-helper {
+          background-color: #fff3cd;
+          border: 1px solid #ffc107;
+          padding: 1rem;
+          margin: 0;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .token-helper button {
+          background-color: #007bff;
+          color: white;
+          border: none;
+          padding: 0.5rem 1rem;
+          border-radius: 4px;
+          cursor: pointer;
+          margin-left: 0.5rem;
+        }
+        .token-helper button:hover {
+          background-color: #0056b3;
+        }
+        .token-helper button:disabled {
+          background-color: #6c757d;
+          cursor: not-allowed;
+        }
+        .token-display {
+          font-family: monospace;
+          font-size: 0.85rem;
+          background-color: #f8f9fa;
+          padding: 0.5rem;
+          border-radius: 4px;
+          margin-top: 0.5rem;
+          word-break: break-all;
+          max-height: 100px;
+          overflow-y: auto;
+        }
+        .token-actions {
+          display: flex;
+          gap: 0.5rem;
+        }
+        .toast-notification {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background-color: #28a745;
+          color: white;
+          padding: 1rem 1.5rem;
+          border-radius: 4px;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          z-index: 10000;
+          display: none;
+        }
       </style>
     </head>
     <body>
+      <!-- Toast notification -->
+      <div id="toast" class="toast-notification"></div>
+      
       <!-- Custom navbar above Swagger UI -->
       <div class="api-navbar">
         <div>
@@ -933,47 +1172,125 @@ app.get('/api-docs', (req, res) => {
       </div>
       ` : ''}
 
+      <!-- Token helper -->
+      <div class="token-helper">
+        <div style="flex: 1;">
+          <strong>🔑 Bearer Token Helper:</strong> Click "Show Token" to copy your authentication token for the Authorize button below.
+          <div id="tokenDisplay" class="token-display" style="display: none;"></div>
+        </div>
+        <div class="token-actions">
+          <button id="showTokenBtn" onclick="showToken()">Show Token</button>
+          <button id="copyTokenBtn" onclick="copyToken()" style="display: none;">Copy Token</button>
+          <button id="hideTokenBtn" onclick="hideToken()" style="display: none;">Hide Token</button>
+        </div>
+      </div>
+
       <div id="swagger-ui"></div>
 
       <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
       <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
       <script>
-        window.onload = function() {
-          // Function to get the bearer token
-          async function getToken() {
-            try {
-              const response = await fetch('/swagger.json');
-              // Just use this request to ensure our session cookie is sent
-              return null;
-            } catch (error) {
-              console.error('Error fetching token:', error);
-              return null;
+        let currentToken = null;
+        
+        function showToast(message) {
+          const toast = document.getElementById('toast');
+          toast.textContent = message;
+          toast.style.display = 'block';
+          setTimeout(() => {
+            toast.style.display = 'none';
+          }, 3000);
+        }
+        
+        async function showToken() {
+          const showBtn = document.getElementById('showTokenBtn');
+          const copyBtn = document.getElementById('copyTokenBtn');
+          const hideBtn = document.getElementById('hideTokenBtn');
+          const tokenDisplay = document.getElementById('tokenDisplay');
+          
+          showBtn.disabled = true;
+          showBtn.textContent = 'Loading...';
+          
+          try {
+            const response = await fetch('/api/current-token');
+            if (!response.ok) {
+              throw new Error('Failed to fetch token');
             }
-          }
-
-          // Initialize Swagger UI
-          getToken().then(token => {
-            const ui = SwaggerUIBundle({
-              url: "/swagger.json",
-              dom_id: '#swagger-ui',
-              deepLinking: true,
-              presets: [
-                SwaggerUIBundle.presets.apis,
-                SwaggerUIStandalonePreset
-              ],
-              layout: "StandaloneLayout",
-              requestInterceptor: (req) => {
-                // Try to include auth header from session cookie
-                if (!req.headers) {
-                  req.headers = {};
-                }
-                // Our session cookie will be automatically included
-                return req;
-              }
-            });
             
-            window.ui = ui;
+            const data = await response.json();
+            currentToken = data.token;
+            
+            tokenDisplay.textContent = currentToken;
+            tokenDisplay.style.display = 'block';
+            showBtn.style.display = 'none';
+            copyBtn.style.display = 'inline-block';
+            hideBtn.style.display = 'inline-block';
+            
+            showToast('Token retrieved successfully! Check browser console for full token.');
+            console.log('='.repeat(80));
+            console.log('BEARER TOKEN (for Swagger Authorize):');
+            console.log('='.repeat(80));
+            console.log(currentToken);
+            console.log('='.repeat(80));
+            console.log('Token expires:', data.expires);
+            console.log('='.repeat(80));
+          } catch (error) {
+            console.error('Error fetching token:', error);
+            showToast('Error fetching token');
+            showBtn.disabled = false;
+            showBtn.textContent = 'Show Token';
+          }
+        }
+        
+        async function copyToken() {
+          if (!currentToken) {
+            showToast('No token available to copy');
+            return;
+          }
+          
+          try {
+            await navigator.clipboard.writeText(currentToken);
+            showToast('✓ Token copied to clipboard!');
+            console.log('Token copied to clipboard');
+          } catch (error) {
+            console.error('Error copying token:', error);
+            showToast('Failed to copy token');
+          }
+        }
+        
+        function hideToken() {
+          const showBtn = document.getElementById('showTokenBtn');
+          const copyBtn = document.getElementById('copyTokenBtn');
+          const hideBtn = document.getElementById('hideTokenBtn');
+          const tokenDisplay = document.getElementById('tokenDisplay');
+          
+          tokenDisplay.style.display = 'none';
+          showBtn.style.display = 'inline-block';
+          showBtn.disabled = false;
+          showBtn.textContent = 'Show Token';
+          copyBtn.style.display = 'none';
+          hideBtn.style.display = 'none';
+        }
+
+        window.onload = function() {
+          // Initialize Swagger UI
+          const ui = SwaggerUIBundle({
+            url: "/swagger.json",
+            dom_id: '#swagger-ui',
+            deepLinking: true,
+            presets: [
+              SwaggerUIBundle.presets.apis,
+              SwaggerUIStandalonePreset
+            ],
+            layout: "StandaloneLayout",
+            requestInterceptor: (req) => {
+              if (!req.headers) {
+                req.headers = {};
+              }
+              return req;
+            }
           });
+          
+          window.ui = ui;
         }
       </script>
     </body>
@@ -982,6 +1299,7 @@ app.get('/api-docs', (req, res) => {
 
   res.send(swaggerHtml);
 });
+
 
 // Swagger UI route
 app.use('/swagger-ui', swaggerUi.serve);
@@ -997,6 +1315,28 @@ app.get('/swagger.json', (req, res) => {
   
   // Send the OpenAPI spec
   res.json(openApiSpec);
+});
+
+// Add this endpoint after your other API routes (around line 400)
+app.get('/api/current-token', (req, res) => {
+  if (!req.session.token) {
+    return res.status(401).json({ 
+      error: 'No token available',
+      message: 'Please authenticate first'
+    });
+  }
+  
+  // Log the token to console for debugging
+  console.log('='.repeat(80));
+  console.log('BEARER TOKEN REQUESTED');
+  console.log('='.repeat(80));
+  console.log(req.session.token);
+  console.log('='.repeat(80));
+  
+  res.json({ 
+    token: req.session.token,
+    expires: req.session.tokenExpires ? new Date(req.session.tokenExpires).toISOString() : 'Unknown'
+  });
 });
 
 // Function to normalize Dataverse URL
@@ -1276,6 +1616,8 @@ function attributeTypeToOpenApiType(attributeType) {
   
   return typeMap[attributeType] || { type: 'string' };
 }
+
+
 
 // Start the server
 const port = process.env.PORT || 3000;
