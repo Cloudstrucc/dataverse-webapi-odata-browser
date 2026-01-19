@@ -285,6 +285,558 @@ dataverse-webapi-odata-browser/
 └── README.md           # This file
 ```
 
+## 🚀 Deployment
+
+### Option 1: Azure App Service (Recommended for Full Functionality)
+
+Azure App Service is the recommended deployment option as it supports the full Node.js backend with authentication.
+
+#### Prerequisites
+- [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) installed
+- Azure subscription
+
+#### Step-by-Step Deployment
+
+**1. Create Azure Resources**
+
+```bash
+# Login to Azure
+az login
+
+# Set variables
+RESOURCE_GROUP="rg-dataverse-api-explorer"
+APP_NAME="dataverse-api-explorer"  # Must be globally unique
+LOCATION="canadacentral"  # Use your preferred region
+
+# Create resource group
+az group create --name $RESOURCE_GROUP --location $LOCATION
+
+# Create App Service Plan (B1 is minimum for always-on)
+az appservice plan create \
+  --name "${APP_NAME}-plan" \
+  --resource-group $RESOURCE_GROUP \
+  --sku B1 \
+  --is-linux
+
+# Create Web App
+az webapp create \
+  --name $APP_NAME \
+  --resource-group $RESOURCE_GROUP \
+  --plan "${APP_NAME}-plan" \
+  --runtime "NODE:18-lts"
+```
+
+**2. Configure Application Settings**
+
+```bash
+# Set environment variables
+az webapp config appsettings set \
+  --name $APP_NAME \
+  --resource-group $RESOURCE_GROUP \
+  --settings \
+    client_id="YOUR_CLIENT_ID" \
+    tenant_id="YOUR_TENANT_ID" \
+    client_secret="YOUR_CLIENT_SECRET" \
+    session_secret="$(openssl rand -base64 32)" \
+    dataverse_url="https://your-org.crm.dynamics.com/" \
+    scopes="https://your-org.crm.dynamics.com/.default" \
+    app_scopes="https://your-org.crm.dynamics.com/.default" \
+    redirectUri="https://${APP_NAME}.azurewebsites.net/auth/callback" \
+    PATH_FILTER="digitalsignature" \
+    AGENCY_NAME="Your Agency Name" \
+    AGENCY_URL="https://www.your-agency.ca" \
+    AGENCY_HEADER_BG="#26374a" \
+    AGENCY_ACCENT_COLOR="#af3c43"
+```
+
+**3. Update Azure AD App Registration**
+
+Add the new redirect URI to your Azure AD app registration:
+- Go to Azure Portal → Azure AD → App registrations → Your app
+- Add redirect URI: `https://<APP_NAME>.azurewebsites.net/auth/callback`
+
+**4. Deploy the Application**
+
+```bash
+# Option A: Deploy from local folder using ZIP deploy
+zip -r deploy.zip . -x "node_modules/*" -x ".git/*" -x ".env"
+az webapp deployment source config-zip \
+  --name $APP_NAME \
+  --resource-group $RESOURCE_GROUP \
+  --src deploy.zip
+
+# Option B: Deploy from GitHub
+az webapp deployment source config \
+  --name $APP_NAME \
+  --resource-group $RESOURCE_GROUP \
+  --repo-url "https://github.com/YOUR_USERNAME/dataverse-webapi-odata-browser" \
+  --branch main \
+  --manual-integration
+```
+
+**5. Enable HTTPS Only**
+
+```bash
+az webapp update \
+  --name $APP_NAME \
+  --resource-group $RESOURCE_GROUP \
+  --https-only true
+```
+
+Your app will be available at: `https://<APP_NAME>.azurewebsites.net`
+
+---
+
+### Option 2: Azure Static Web Apps (Swagger UI Only)
+
+If you only need to display pre-generated Swagger documentation (no dynamic generation), you can use Azure Static Web Apps for a cost-effective, serverless solution.
+
+#### Prerequisites
+- Pre-generated `swagger.json` file
+- GitHub repository
+
+**1. Create Static Swagger UI Site**
+
+Create a new folder structure:
+
+```
+static-swagger/
+├── index.html
+├── swagger.json          # Your pre-generated OpenAPI spec
+└── staticwebapp.config.json
+```
+
+**2. Create index.html**
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Documentation</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
+  <style>
+    :root {
+      --agency-header-bg: #26374a;
+      --agency-accent: #af3c43;
+    }
+    body { margin: 0; padding: 0; }
+    .header {
+      background-color: var(--agency-header-bg);
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header h1 { margin: 0; font-size: 1.25rem; }
+    .accent-bar { height: 4px; background-color: var(--agency-accent); }
+    .swagger-ui .topbar { display: none; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>Your Agency - API Documentation</h1>
+  </header>
+  <div class="accent-bar"></div>
+  <div id="swagger-ui"></div>
+  
+  <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+  <script>
+    window.onload = () => {
+      SwaggerUIBundle({
+        url: "./swagger.json",
+        dom_id: '#swagger-ui',
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        layout: "StandaloneLayout"
+      });
+    };
+  </script>
+</body>
+</html>
+```
+
+**3. Create staticwebapp.config.json**
+
+```json
+{
+  "navigationFallback": {
+    "rewrite": "/index.html"
+  },
+  "mimeTypes": {
+    ".json": "application/json"
+  }
+}
+```
+
+**4. Deploy to Azure Static Web Apps**
+
+```bash
+# Install SWA CLI
+npm install -g @azure/static-web-apps-cli
+
+# Login and deploy
+swa login
+swa deploy ./static-swagger --env production
+```
+
+Or deploy via Azure Portal:
+1. Go to Azure Portal → Create Resource → Static Web App
+2. Connect to your GitHub repository
+3. Set app location to `/static-swagger`
+4. Deploy
+
+---
+
+### Option 3: Azure Blob Storage Static Website
+
+For simple static hosting without GitHub integration.
+
+**1. Create Storage Account**
+
+```bash
+STORAGE_ACCOUNT="swaborgstorage"  # Must be globally unique
+RESOURCE_GROUP="rg-dataverse-api-explorer"
+
+# Create storage account
+az storage account create \
+  --name $STORAGE_ACCOUNT \
+  --resource-group $RESOURCE_GROUP \
+  --location canadacentral \
+  --sku Standard_LRS \
+  --kind StorageV2
+
+# Enable static website hosting
+az storage blob service-properties update \
+  --account-name $STORAGE_ACCOUNT \
+  --static-website \
+  --index-document index.html \
+  --404-document index.html
+```
+
+**2. Upload Files**
+
+```bash
+# Upload static files
+az storage blob upload-batch \
+  --account-name $STORAGE_ACCOUNT \
+  --source ./static-swagger \
+  --destination '$web'
+```
+
+**3. Get Website URL**
+
+```bash
+az storage account show \
+  --name $STORAGE_ACCOUNT \
+  --resource-group $RESOURCE_GROUP \
+  --query "primaryEndpoints.web" \
+  --output tsv
+```
+
+**4. (Optional) Add Custom Domain with Azure CDN**
+
+```bash
+# Create CDN profile
+az cdn profile create \
+  --name "${STORAGE_ACCOUNT}-cdn" \
+  --resource-group $RESOURCE_GROUP \
+  --sku Standard_Microsoft
+
+# Create CDN endpoint
+az cdn endpoint create \
+  --name "${STORAGE_ACCOUNT}-endpoint" \
+  --profile-name "${STORAGE_ACCOUNT}-cdn" \
+  --resource-group $RESOURCE_GROUP \
+  --origin "${STORAGE_ACCOUNT}.z13.web.core.windows.net" \
+  --origin-host-header "${STORAGE_ACCOUNT}.z13.web.core.windows.net"
+```
+
+---
+
+### Option 4: Power Pages Integration
+
+Embed the Swagger documentation within a Power Pages site using a custom web template with an iframe or a PCF (Power Apps Component Framework) control.
+
+#### Option 4a: Iframe Embed (Simplest)
+
+**1. Deploy Swagger UI to Azure** (using Option 1, 2, or 3 above)
+
+**2. Create a Web Template in Power Pages**
+
+Go to Power Pages Management → Web Templates → New:
+
+**Name:** `Swagger API Documentation`
+
+**Source:**
+```html
+{% extends 'Layout 1 Column' %}
+
+{% block main %}
+<div class="container-fluid px-0">
+  <style>
+    .api-docs-header {
+      background-color: #26374a;
+      color: white;
+      padding: 1.5rem 2rem;
+      margin-bottom: 0;
+    }
+    .api-docs-header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+    .accent-bar {
+      height: 4px;
+      background-color: #af3c43;
+    }
+    .swagger-container {
+      width: 100%;
+      height: calc(100vh - 200px);
+      min-height: 600px;
+      border: none;
+    }
+    .swagger-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    .api-notice {
+      background-color: #fff3cd;
+      border: 1px solid #ffc107;
+      padding: 1rem;
+      margin: 0;
+      font-size: 0.9rem;
+    }
+  </style>
+  
+  <div class="api-docs-header">
+    <h1>{{ page.title | default: 'API Documentation' }}</h1>
+    <p class="mb-0 mt-2" style="opacity: 0.8;">Interactive documentation for Dataverse APIs</p>
+  </div>
+  <div class="accent-bar"></div>
+  
+  {% if user %}
+    <div class="swagger-container">
+      <iframe 
+        src="https://YOUR-SWAGGER-APP.azurewebsites.net/api-docs" 
+        class="swagger-iframe"
+        title="API Documentation"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups">
+      </iframe>
+    </div>
+  {% else %}
+    <div class="api-notice">
+      <strong>Authentication Required:</strong> Please <a href="{{ sitemarkers['Login'].url }}">sign in</a> to view the API documentation.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+```
+
+**3. Create a Page Template**
+
+Go to Power Pages Management → Page Templates → New:
+- **Name:** `API Documentation Template`
+- **Web Template:** Select "Swagger API Documentation"
+- **Use Website Header and Footer:** Yes
+
+**4. Create a Web Page**
+
+Go to Power Pages Management → Web Pages → New:
+- **Name:** `API Documentation`
+- **Page Template:** Select "API Documentation Template"
+- **Partial URL:** `api-docs`
+
+**5. Add to Navigation (Optional)**
+
+Add a Web Link to your site's navigation pointing to the new page.
+
+---
+
+#### Option 4b: Custom PCF Control (Advanced)
+
+For a more integrated experience, create a PCF control that renders Swagger UI directly.
+
+**1. Create PCF Project**
+
+```bash
+# Install Power Platform CLI
+npm install -g pac
+
+# Create new PCF project
+mkdir SwaggerViewer
+cd SwaggerViewer
+pac pcf init --namespace YourOrg --name SwaggerViewer --template field
+
+# Install dependencies
+npm install swagger-ui
+```
+
+**2. Update ControlManifest.Input.xml**
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<manifest>
+  <control namespace="YourOrg" constructor="SwaggerViewer" 
+           version="1.0.0" display-name-key="Swagger Viewer" 
+           description-key="Displays Swagger/OpenAPI documentation">
+    <property name="specUrl" display-name-key="Spec URL" 
+              description-key="URL to the OpenAPI specification" 
+              of-type="SingleLine.URL" usage="bound" required="true"/>
+    <resources>
+      <code path="index.ts" order="1"/>
+      <css path="css/swagger-ui.css" order="1"/>
+    </resources>
+  </control>
+</manifest>
+```
+
+**3. Implement index.ts**
+
+```typescript
+import { IInputs, IOutputs } from "./generated/ManifestTypes";
+import SwaggerUI from "swagger-ui";
+import "swagger-ui/dist/swagger-ui.css";
+
+export class SwaggerViewer implements ComponentFramework.StandardControl<IInputs, IOutputs> {
+    private _container: HTMLDivElement;
+    private _specUrl: string;
+
+    public init(
+        context: ComponentFramework.Context<IInputs>,
+        notifyOutputChanged: () => void,
+        state: ComponentFramework.Dictionary,
+        container: HTMLDivElement
+    ): void {
+        this._container = container;
+        this._specUrl = context.parameters.specUrl.raw || "";
+        this.renderSwagger();
+    }
+
+    private renderSwagger(): void {
+        if (this._specUrl) {
+            this._container.innerHTML = '<div id="swagger-ui"></div>';
+            SwaggerUI({
+                url: this._specUrl,
+                dom_id: "#swagger-ui",
+                presets: [SwaggerUI.presets.apis, SwaggerUI.SwaggerUIStandalonePreset],
+                layout: "StandaloneLayout"
+            });
+        }
+    }
+
+    public updateView(context: ComponentFramework.Context<IInputs>): void {
+        const newUrl = context.parameters.specUrl.raw || "";
+        if (newUrl !== this._specUrl) {
+            this._specUrl = newUrl;
+            this.renderSwagger();
+        }
+    }
+
+    public destroy(): void {
+        this._container.innerHTML = "";
+    }
+
+    public getOutputs(): IOutputs {
+        return {};
+    }
+}
+```
+
+**4. Build and Deploy**
+
+```bash
+# Build the control
+npm run build
+
+# Create solution
+pac solution init --publisher-name YourPublisher --publisher-prefix yourprefix
+pac solution add-reference --path ./
+
+# Build solution
+msbuild /t:restore
+msbuild
+
+# Deploy to environment
+pac auth create --url https://your-org.crm.dynamics.com
+pac pcf push --publisher-prefix yourprefix
+```
+
+**5. Add to Power Pages**
+
+Once deployed, you can add the PCF control to a model-driven form or use it via a custom connector in Power Pages.
+
+---
+
+#### Option 4c: Liquid + JavaScript (No External Hosting)
+
+Embed Swagger UI directly in Power Pages without external hosting by storing the spec in a Web File.
+
+**1. Upload swagger.json as Web File**
+
+Go to Power Pages Management → Web Files → New:
+- **Name:** `swagger-spec`
+- **Partial URL:** `swagger.json`
+- **Upload:** Your generated swagger.json file
+
+**2. Create Web Template**
+
+```html
+{% extends 'Layout 1 Column' %}
+
+{% block main %}
+<div class="container-fluid px-0">
+  <style>
+    .api-header { background: #26374a; color: white; padding: 1.5rem 2rem; }
+    .api-header h1 { margin: 0; font-size: 1.5rem; }
+    .accent-bar { height: 4px; background: #af3c43; }
+    #swagger-ui { padding: 1rem; }
+    .swagger-ui .topbar { display: none; }
+  </style>
+  
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
+  
+  <div class="api-header">
+    <h1>{{ page.title }}</h1>
+  </div>
+  <div class="accent-bar"></div>
+  
+  <div id="swagger-ui"></div>
+  
+  <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = function() {
+      SwaggerUIBundle({
+        url: "{{ website.url }}/swagger.json",
+        dom_id: '#swagger-ui',
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        layout: "StandaloneLayout"
+      });
+    };
+  </script>
+</div>
+{% endblock %}
+```
+
+---
+
+### Deployment Comparison
+
+| Feature | App Service | Static Web App | Blob Storage | Power Pages |
+|---------|-------------|----------------|--------------|-------------|
+| Dynamic API Generation | ✅ | ❌ | ❌ | ❌ |
+| User/App Authentication | ✅ | ❌ | ❌ | Via Portal |
+| Path Filtering | ✅ | Pre-generated | Pre-generated | Pre-generated |
+| Agency Branding | ✅ Dynamic | Static | Static | ✅ Liquid |
+| Cost | ~$13-55/mo | Free-$9/mo | ~$1/mo | Included |
+| Custom Domain | ✅ | ✅ | Via CDN | ✅ |
+| Best For | Full functionality | Static docs | Simple hosting | Portal integration |
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
