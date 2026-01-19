@@ -57,19 +57,14 @@ Create a `.env` file in the root of the project with the following content:
 
 ```
 # Azure AD Configuration
-client_id="YOUR_CLIENT_ID"
+client_secret="YOUR_CLIENT_SECRET"
 tenant_id="YOUR_TENANT_ID"
-client_secret="YOUR CLIENT SECRET"
 
 # Application Configuration
 session_secret="RANDOM_SESSION_SECRET"
 
 # Dataverse Configuration
 dataverse_url="https://your-org.crm.dynamics.com/"
-
-scopes = ['https://vcs-website-csdev.crm3.dynamics.com/.default']
-
-redirectURI = "http://localhost:3000/auth/callback"
 ```
 
 Replace the placeholders with your actual values:

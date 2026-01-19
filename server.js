@@ -1,5 +1,4 @@
-
-// server.js - With publisher dropdown feature
+// server.js - With publisher dropdown feature and dual authentication
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -44,7 +43,8 @@ const azureConfig = {
   },
   clientSecret: process.env.client_secret,
   redirectUri: process.env.redirectUri,
-  scopes: [process.env.scopes] // Convert string to array
+  scopes: [process.env.scopes],
+  appScopes: [process.env.app_scopes || process.env.scopes]
 };
 
 // Initialize MSAL
@@ -65,7 +65,6 @@ let msalConfig = {
   }
 };
 
-
 let cca = new msal.ConfidentialClientApplication(msalConfig);
 
 // Global variable to store OpenAPI spec
@@ -74,7 +73,7 @@ let openApiSpec = null;
 // Authentication middleware to check token validity
 function checkAuthentication(req, res, next) {
   // Skip authentication for public routes
-  const publicPaths = ['/', '/auth/login', '/auth/callback', '/auth/logout'];
+  const publicPaths = ['/', '/auth/login', '/auth/callback', '/auth/logout', '/auth/app-login'];
   if (publicPaths.includes(req.path)) {
     return next();
   }
@@ -121,7 +120,7 @@ app.use(checkAuthentication);
 // Home route - Login or Dashboard
 app.get('/', (req, res) => {
   if (!req.session.token) {
-    // Login page
+    // Login page with both authentication options
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
@@ -141,13 +140,43 @@ app.get('/', (req, res) => {
           }
           .form-signin {
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
             padding: 15px;
             margin: auto;
           }
           .brand-logo {
             height: 60px;
             margin-bottom: 1.5rem;
+          }
+          .auth-divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 1.5rem 0;
+          }
+          .auth-divider::before,
+          .auth-divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #dee2e6;
+          }
+          .auth-divider span {
+            padding: 0 1rem;
+            color: #6c757d;
+            font-size: 0.875rem;
+          }
+          .auth-option {
+            margin-bottom: 1rem;
+          }
+          .auth-option .btn {
+            position: relative;
+            padding-left: 2.5rem;
+          }
+          .auth-option .btn-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
           }
         </style>
       </head>
@@ -166,7 +195,26 @@ app.get('/', (req, res) => {
               </div>
               <button type="submit" class="w-100 btn btn-secondary">Set Tenant ID</button>
             </form>
-            <a href="/auth/login" class="w-100 btn btn-lg btn-primary">Sign in with Microsoft</a>
+            
+            <div class="auth-divider">
+              <span>Choose Authentication Method</span>
+            </div>
+            
+            <div class="auth-option">
+              <a href="/auth/login" class="w-100 btn btn-lg btn-primary">
+                <span class="btn-icon">👤</span>
+                Sign in as User
+              </a>
+              <small class="text-muted d-block mt-1">Uses your user account and security roles</small>
+            </div>
+            
+            <div class="auth-option">
+              <a href="/auth/app-login" class="w-100 btn btn-lg btn-success">
+                <span class="btn-icon">🔑</span>
+                Sign in as Application
+              </a>
+              <small class="text-muted d-block mt-1">Uses app registration identity and permissions</small>
+            </div>
           </div>
         </main>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
@@ -174,6 +222,12 @@ app.get('/', (req, res) => {
       </html>
     `);
   } else {
+    // Show auth type in dashboard
+    const authType = req.session.authType || 'user';
+    const authBadge = authType === 'application' 
+      ? '<span class="badge bg-success">Application Identity</span>' 
+      : '<span class="badge bg-primary">User Identity</span>';
+    
     // Dashboard page with publisher dropdown
     res.send(`
       <!DOCTYPE html>
@@ -205,10 +259,18 @@ app.get('/', (req, res) => {
           .alert {
             margin-bottom: 20px;
           }
+          .auth-status {
+            text-align: center;
+            margin-bottom: 1rem;
+          }
         </style>
       </head>
       <body>
         <div class="container">
+          <div class="auth-status">
+            <small class="text-muted">Authenticated with: ${authBadge}</small>
+          </div>
+          
           <h1 class="h3 mb-3 fw-normal text-center">Generate API Documentation</h1>
           
           <div id="statusMessages"></div>
@@ -243,6 +305,16 @@ app.get('/', (req, res) => {
                 </div>
                 <button class="w-100 btn btn-lg btn-primary" type="submit">Generate API Docs</button>
               </form>
+              
+              <!-- Debug Section -->
+              <div class="mt-3 pt-3 border-top">
+                <button class="btn btn-sm btn-outline-info" onclick="checkIdentity()">
+                  🔍 Check Current Identity
+                </button>
+                <div id="identityInfo" class="mt-2" style="display: none;">
+                  <pre class="bg-light p-2 small" style="max-height: 200px; overflow-y: auto;"></pre>
+                </div>
+              </div>
             </div>
           </div>
           
@@ -253,6 +325,20 @@ app.get('/', (req, res) => {
         
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
         <script>
+          async function checkIdentity() {
+            try {
+              const response = await fetch('/api/whoami');
+              const data = await response.json();
+              
+              const identityDiv = document.getElementById('identityInfo');
+              identityDiv.style.display = 'block';
+              identityDiv.querySelector('pre').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+              console.error('Error checking identity:', error);
+              alert('Error checking identity. See console for details.');
+            }
+          }
+          
           document.addEventListener('DOMContentLoaded', function() {
             const publisherDropdown = document.getElementById('publisherDropdown');
             const loadPublishersBtn = document.getElementById('loadPublishers');
@@ -385,7 +471,6 @@ app.get('/', (req, res) => {
 });
 
 // Set tenant ID
-// Set tenant ID
 app.post('/set-tenant', (req, res) => {
   const tenantId = req.body.tenantId.trim();
   
@@ -411,7 +496,7 @@ app.get('/auth/login', (req, res) => {
   
   const authCodeUrlParameters = {
     scopes: azureConfig.scopes,
-    redirectUri: azureConfig.redirectUri, // Make sure this is explicitly set
+    redirectUri: azureConfig.redirectUri,
   };
 
   console.log('Auth parameters:', JSON.stringify(authCodeUrlParameters, null, 2));
@@ -444,6 +529,65 @@ app.get('/auth/login', (req, res) => {
     });
 });
 
+// Application-only authentication (uses app identity, not user identity)
+app.get('/auth/app-login', async (req, res) => {
+  console.log('App-only authentication initiated');
+  
+  try {
+    const clientCredentialRequest = {
+      scopes: azureConfig.appScopes,
+    };
+
+    const response = await cca.acquireTokenByClientCredential(clientCredentialRequest);
+    
+    if (response && response.accessToken) {
+      console.log('='.repeat(80));
+      console.log('APP-ONLY TOKEN ACQUIRED (Application Identity):');
+      console.log('='.repeat(80));
+      console.log(response.accessToken);
+      console.log('='.repeat(80));
+      
+      req.session.token = response.accessToken;
+      req.session.authType = 'application';
+      openApiSpec = null; // Clear any cached spec
+      req.session.openApiGenerated = false;
+      
+      // Store token expiration
+      const expiresIn = response.expiresOn ? new Date(response.expiresOn).getTime() - Date.now() : 3600 * 1000;
+      req.session.tokenExpires = Date.now() + expiresIn;
+      
+      console.log(`Token will expire in ${Math.floor(expiresIn / 1000 / 60)} minutes`);
+      console.log(`Token expires at: ${new Date(req.session.tokenExpires).toISOString()}`);
+      console.log('='.repeat(80));
+      
+      res.redirect('/');
+    } else {
+      throw new Error('No token received from authentication');
+    }
+  } catch (error) {
+    console.error('App Authentication Error:', error);
+    res.status(500).send(`
+      <html>
+        <head>
+          <title>Authentication Error</title>
+          <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+        </head>
+        <body class="bg-light p-5">
+          <div class="container">
+            <div class="alert alert-danger">
+              <h4>Application Authentication Error</h4>
+              <p>${error.message || 'Error during application authentication'}</p>
+              <pre>${JSON.stringify(error, null, 2)}</pre>
+              <p class="mt-3"><strong>Note:</strong> Make sure your App Registration has the user_impersonation delegated permission for Dynamics CRM with admin consent granted, and that you've created an Application User in Power Platform Admin Center with the appropriate security roles.</p>
+              <a href="/" class="btn btn-primary">Return to Home</a>
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+});
+
 app.get('/auth/callback', (req, res) => {
   console.log('Auth callback received');
   
@@ -463,6 +607,9 @@ app.get('/auth/callback', (req, res) => {
       console.log('='.repeat(80));
       
       req.session.token = response.accessToken;
+      req.session.authType = 'user';
+      openApiSpec = null; // Clear any cached spec
+      req.session.openApiGenerated = false;
       
       // Store token expiration
       const expiresIn = response.expiresOn ? new Date(response.expiresOn).getTime() - Date.now() : 3600 * 1000;
@@ -498,12 +645,116 @@ app.get('/auth/callback', (req, res) => {
 });
 
 app.get('/auth/logout', (req, res) => {
+  // Clear all session data
+  req.session.token = null;
+  req.session.tokenExpires = null;
+  req.session.authType = null;
+  req.session.openApiGenerated = null;
+  req.session.prefix = null;
+  
   req.session.destroy((err) => {
     if (err) {
       console.error('Error destroying session:', err);
     }
     res.redirect('/');
   });
+});
+
+// Debug endpoint to check current authentication details
+app.get('/api/whoami', async (req, res) => {
+  if (!req.session.token) {
+    return res.status(401).json({ error: 'No token available' });
+  }
+
+  try {
+    // Decode JWT to see claims
+    const tokenParts = req.session.token.split('.');
+    const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+    
+    // Call Dataverse WhoAmI function to see the actual user
+    const whoAmIUrl = `${normalizeDataverseUrl(process.env.dataverse_url)}WhoAmI`;
+    
+    const whoAmIResponse = await axios.get(whoAmIUrl, {
+      headers: { 
+        'Authorization': `Bearer ${req.session.token}`,
+        'Accept': 'application/json',
+        'OData-MaxVersion': '4.0',
+        'OData-Version': '4.0'
+      }
+    });
+    
+    res.json({
+      sessionAuthType: req.session.authType,
+      tokenClaims: {
+        appid: payload.appid,
+        oid: payload.oid,
+        upn: payload.upn || 'N/A (Application)',
+        unique_name: payload.unique_name || 'N/A',
+        app_displayname: payload.app_displayname || 'N/A'
+      },
+      dataverseIdentity: {
+        UserId: whoAmIResponse.data.UserId,
+        BusinessUnitId: whoAmIResponse.data.BusinessUnitId,
+        OrganizationId: whoAmIResponse.data.OrganizationId
+      }
+    });
+  } catch (error) {
+    console.error('WhoAmI error:', error.response?.data || error.message);
+    res.status(500).json({ 
+      error: 'Failed to get identity info',
+      details: error.response?.data || error.message 
+    });
+  }
+});
+
+// API endpoint to check security role privileges
+app.get('/api/check-privileges', async (req, res) => {
+  if (!req.session.token) {
+    return res.status(401).json({ error: 'No token available' });
+  }
+
+  try {
+    const apiUrl = normalizeDataverseUrl(process.env.dataverse_url);
+    
+    // Get current user info
+    const whoAmI = await axios.get(`${apiUrl}WhoAmI`, {
+      headers: { 
+        'Authorization': `Bearer ${req.session.token}`,
+        'Accept': 'application/json',
+        'OData-MaxVersion': '4.0',
+        'OData-Version': '4.0'
+      }
+    });
+    
+    const userId = whoAmI.data.UserId;
+    
+    // Get user's security roles
+    const rolesQuery = `${apiUrl}systemuserrolescollection?$filter=systemuserid eq ${userId}&$expand=roleid($select=name,roleid)`;
+    
+    const rolesResponse = await axios.get(rolesQuery, {
+      headers: { 
+        'Authorization': `Bearer ${req.session.token}`,
+        'Accept': 'application/json',
+        'OData-MaxVersion': '4.0',
+        'OData-Version': '4.0'
+      }
+    });
+    
+    res.json({
+      userId: userId,
+      authType: req.session.authType,
+      securityRoles: rolesResponse.data.value.map(r => ({
+        roleId: r.roleid?.roleid,
+        roleName: r.roleid?.name
+      }))
+    });
+  } catch (error) {
+    console.error('Check privileges error:', error.response?.data || error.message);
+    res.status(500).json({ 
+      error: 'Failed to check privileges',
+      details: error.response?.data || error.message 
+    });
+  }
 });
 
 // API endpoint to fetch publishers
@@ -513,7 +764,7 @@ app.get('/api/fetch-publishers', async (req, res) => {
     console.log('No token found in session, sending auth required response');
     return res.status(401).json({ 
       error: 'Authentication required',
-      redirect: '/auth/login'  // Include redirect URL
+      redirect: '/auth/login'
     });
   }
 
@@ -561,7 +812,7 @@ app.get('/api/fetch-publishers', async (req, res) => {
     // Check if the error is due to an authentication issue
     if (error.response && (error.response.status === 401 || error.response.status === 403)) {
       // Token might be expired or invalid
-      req.session.token = null; // Clear the invalid token
+      req.session.token = null;
       return res.status(401).json({ 
         error: 'Authentication failed or expired',
         redirect: '/auth/login'
@@ -641,7 +892,6 @@ app.post('/generate-docs', async (req, res) => {
           </div>
         </main>
         <script>
-          // Direct API call approach instead of redirect
           fetch('/api/generate-openapi', {
             method: 'POST',
             headers: {
@@ -655,7 +905,6 @@ app.post('/generate-docs', async (req, res) => {
           .then(response => {
             if (!response.ok) {
               return response.json().then(errorData => {
-                // Check if we need to redirect for authentication
                 if (response.status === 401 && errorData.redirect) {
                   window.location.href = errorData.redirect;
                   throw new Error('Authentication required. Redirecting to login...');
@@ -666,7 +915,6 @@ app.post('/generate-docs', async (req, res) => {
             return response.json();
           })
           .then(data => {
-            // Check if the response has a warning
             if (data.warning) {
               console.warn(data.warning);
             }
@@ -674,7 +922,6 @@ app.post('/generate-docs', async (req, res) => {
           })
           .catch(error => {
             console.error('Error:', error);
-            // Don't show alert if we're redirecting for authentication
             if (!error.message.includes('Redirecting to login')) {
               document.querySelector('.loading-container').innerHTML = \`
                 <div class="alert alert-danger">
@@ -709,60 +956,48 @@ app.post('/api/generate-openapi', async (req, res) => {
   const prefix = req.body.prefix;
   
   try {
-    // 1. First try to fetch entity data directly instead of XML metadata
     console.log(`Generating OpenAPI spec for ${envUrl} with prefix ${prefix || 'None'}`);
+    console.log(`Using auth type: ${req.session.authType || 'user'}`);
     
-    // Basic validation
     if (!envUrl) {
       throw new Error('Dataverse URL is required');
     }
     
-    // Normalize URL for API calls
     const apiUrl = normalizeDataverseUrl(envUrl);
     console.log(`Using normalized URL: ${apiUrl}`);
     
-    // 2. Generate OpenAPI spec from entity data with better error handling
     try {
       openApiSpec = await generateSimpleOpenApiSpec(apiUrl, req.session.token, prefix);
       
-      // Set flag in session
       req.session.openApiGenerated = true;
       req.session.prefix = prefix;
       
-      // Save spec to file for debugging
       try {
         const specPath = path.join(tempDir, 'openapi-spec.json');
         fs.writeFileSync(specPath, JSON.stringify(openApiSpec, null, 2));
         console.log(`OpenAPI spec saved to ${specPath}`);
       } catch (fileError) {
         console.warn('Warning: Could not save spec file for debugging:', fileError.message);
-        // Don't fail the operation for this
       }
       
-      // Return success
       res.status(200).json({ success: true });
     } catch (specError) {
       console.error('Error generating OpenAPI spec:', specError);
       
-      // Check if it's an authentication issue
       if (specError.response && (specError.response.status === 401 || specError.response.status === 403)) {
-        // Token might be expired or invalid
-        req.session.token = null; // Clear the invalid token
+        req.session.token = null;
         return res.status(401).json({ 
           error: 'Authentication failed or expired',
           redirect: '/auth/login'
         });
       }
       
-      // Generate a minimal fallback spec
       console.log('Generating fallback OpenAPI spec');
       openApiSpec = createFallbackSpec(apiUrl, specError);
       
-      // Set flags in session
       req.session.openApiGenerated = true;
       req.session.prefix = prefix;
       
-      // Return success but with warning
       res.status(200).json({ 
         success: true, 
         warning: 'Using fallback specification due to error',
@@ -848,165 +1083,6 @@ function createFallbackSpec(baseUrl, error) {
 }
 
 // API docs route
-// app.get('/api-docs', (req, res) => {
-//   if (!openApiSpec) {
-//     return res.send(`
-//       <!DOCTYPE html>
-//       <html lang="en">
-//       <head>
-//         <meta charset="utf-8">
-//         <meta name="viewport" content="width=device-width, initial-scale=1">
-//         <title>No Documentation - Dataverse API Explorer</title>
-//         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-//         <style>
-//           html, body {
-//             height: 100%;
-//           }
-          
-//           body {
-//             display: flex;
-//             align-items: center;
-//             padding-top: 40px;
-//             padding-bottom: 40px;
-//             background-color: #f5f5f5;
-//           }
-          
-//           .container {
-//             width: 100%;
-//             max-width: 600px;
-//             padding: 15px;
-//             margin: auto;
-//             text-align: center;
-//           }
-//         </style>
-//       </head>
-//       <body>
-//         <main class="container">
-//           <div class="card">
-//             <div class="card-body">
-//               <h5 class="card-title">No API Documentation Available</h5>
-//               <p class="card-text">Please generate documentation first.</p>
-//               <a href="/" class="btn btn-primary">Go Back</a>
-//             </div>
-//           </div>
-//         </main>
-//       </body>
-//       </html>
-//     `);
-//   }
-  
-//   // Create custom HTML page using CDN resources for Swagger UI
-//   const prefix = req.session.prefix || '';
-//   const swaggerHtml = `
-//     <!DOCTYPE html>
-//     <html lang="en">
-//     <head>
-//       <meta charset="UTF-8">
-//       <title>Dataverse API Documentation</title>
-//       <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
-//       <style>
-//         html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
-//         *, *:before, *:after { box-sizing: inherit; }
-//         body { margin: 0; padding: 0; }
-//         .swagger-ui .topbar { display: none; }
-        
-//         /* Custom navbar */
-//         .api-navbar {
-//           background-color: #007bff;
-//           padding: 1rem;
-//           color: white;
-//           display: flex;
-//           justify-content: space-between;
-//           align-items: center;
-//         }
-//         .api-navbar a {
-//           color: white;
-//           text-decoration: none;
-//           padding: 0.5rem 1rem;
-//           border-radius: 4px;
-//         }
-//         .api-navbar a:hover {
-//           background-color: rgba(255, 255, 255, 0.1);
-//         }
-//         .prefix-filter {
-//           background-color: #e9f7ff;
-//           padding: 0.75rem;
-//           margin-top: 0;
-//           border-bottom: 1px solid #ccc;
-//           font-size: 0.9rem;
-//         }
-//       </style>
-//     </head>
-//     <body>
-//       <!-- Custom navbar above Swagger UI -->
-//       <div class="api-navbar">
-//         <div>
-//           <span>Dataverse API Documentation</span>
-//         </div>
-//         <div>
-//           <a href="/">Home</a>
-//           <a href="/auth/logout">Sign Out</a>
-//         </div>
-//       </div>
-
-//       ${prefix ? `
-//       <!-- Prefix filter info -->
-//       <div class="prefix-filter">
-//         <strong>Entity prefix filter applied:</strong> ${prefix}
-//       </div>
-//       ` : ''}
-
-//       <div id="swagger-ui"></div>
-
-//       <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
-//       <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
-//       <script>
-//         window.onload = function() {
-//           // Function to get the bearer token
-//           async function getToken() {
-//             try {
-//               const response = await fetch('/swagger.json');
-//               // Just use this request to ensure our session cookie is sent
-//               return null;
-//             } catch (error) {
-//               console.error('Error fetching token:', error);
-//               return null;
-//             }
-//           }
-
-//           // Initialize Swagger UI
-//           getToken().then(token => {
-//             const ui = SwaggerUIBundle({
-//               url: "/swagger.json",
-//               dom_id: '#swagger-ui',
-//               deepLinking: true,
-//               presets: [
-//                 SwaggerUIBundle.presets.apis,
-//                 SwaggerUIStandalonePreset
-//               ],
-//               layout: "StandaloneLayout",
-//               requestInterceptor: (req) => {
-//                 // Try to include auth header from session cookie
-//                 if (!req.headers) {
-//                   req.headers = {};
-//                 }
-//                 // Our session cookie will be automatically included
-//                 return req;
-//               }
-//             });
-            
-//             window.ui = ui;
-//           });
-//         }
-//       </script>
-//     </body>
-//     </html>
-//   `;
-
-//   res.send(swaggerHtml);
-// });
-
-// API docs route
 app.get('/api-docs', (req, res) => {
   if (!openApiSpec) {
     return res.send(`
@@ -1054,8 +1130,12 @@ app.get('/api-docs', (req, res) => {
     `);
   }
   
-  // Create custom HTML page using CDN resources for Swagger UI
   const prefix = req.session.prefix || '';
+  const authType = req.session.authType || 'user';
+  const authBadge = authType === 'application' 
+    ? '<span class="badge bg-success">Application Identity</span>' 
+    : '<span class="badge bg-primary">User Identity</span>';
+    
   const swaggerHtml = `
     <!DOCTYPE html>
     <html lang="en">
@@ -1069,7 +1149,6 @@ app.get('/api-docs', (req, res) => {
         body { margin: 0; padding: 0; }
         .swagger-ui .topbar { display: none; }
         
-        /* Custom navbar */
         .api-navbar {
           background-color: #007bff;
           padding: 1rem;
@@ -1094,8 +1173,6 @@ app.get('/api-docs', (req, res) => {
           border-bottom: 1px solid #ccc;
           font-size: 0.9rem;
         }
-        
-        /* Token helper styles */
         .token-helper {
           background-color: #fff3cd;
           border: 1px solid #ffc107;
@@ -1151,13 +1228,11 @@ app.get('/api-docs', (req, res) => {
       </style>
     </head>
     <body>
-      <!-- Toast notification -->
       <div id="toast" class="toast-notification"></div>
       
-      <!-- Custom navbar above Swagger UI -->
       <div class="api-navbar">
         <div>
-          <span>Dataverse API Documentation</span>
+          <span>Dataverse API Documentation - ${authBadge}</span>
         </div>
         <div>
           <a href="/">Home</a>
@@ -1166,13 +1241,11 @@ app.get('/api-docs', (req, res) => {
       </div>
 
       ${prefix ? `
-      <!-- Prefix filter info -->
       <div class="prefix-filter">
         <strong>Entity prefix filter applied:</strong> ${prefix}
       </div>
       ` : ''}
 
-      <!-- Token helper -->
       <div class="token-helper">
         <div style="flex: 1;">
           <strong>🔑 Bearer Token Helper:</strong> Click "Show Token" to copy your authentication token for the Authorize button below.
@@ -1272,7 +1345,6 @@ app.get('/api-docs', (req, res) => {
         }
 
         window.onload = function() {
-          // Initialize Swagger UI
           const ui = SwaggerUIBundle({
             url: "/swagger.json",
             dom_id: '#swagger-ui',
@@ -1300,7 +1372,6 @@ app.get('/api-docs', (req, res) => {
   res.send(swaggerHtml);
 });
 
-
 // Swagger UI route
 app.use('/swagger-ui', swaggerUi.serve);
 
@@ -1310,14 +1381,11 @@ app.get('/swagger.json', (req, res) => {
     return res.status(404).json({ error: "No API specification available" });
   }
   
-  // Set proper content type
   res.setHeader('Content-Type', 'application/json');
-  
-  // Send the OpenAPI spec
   res.json(openApiSpec);
 });
 
-// Add this endpoint after your other API routes (around line 400)
+// API endpoint to get current token
 app.get('/api/current-token', (req, res) => {
   if (!req.session.token) {
     return res.status(401).json({ 
@@ -1326,7 +1394,6 @@ app.get('/api/current-token', (req, res) => {
     });
   }
   
-  // Log the token to console for debugging
   console.log('='.repeat(80));
   console.log('BEARER TOKEN REQUESTED');
   console.log('='.repeat(80));
@@ -1343,12 +1410,10 @@ app.get('/api/current-token', (req, res) => {
 function normalizeDataverseUrl(url) {
   let normalizedUrl = url.trim();
   
-  // Ensure URL ends with a slash
   if (!normalizedUrl.endsWith('/')) {
     normalizedUrl += '/';
   }
   
-  // Add api/data/v9.2/ if not present
   if (!normalizedUrl.includes('/api/data/v')) {
     if (normalizedUrl.endsWith('/web/')) {
       normalizedUrl = normalizedUrl.replace(/web\/$/, 'api/data/v9.2/');
@@ -1363,7 +1428,6 @@ function normalizeDataverseUrl(url) {
 // Function to generate a simple OpenAPI spec directly from entity data
 async function generateSimpleOpenApiSpec(apiUrl, token, prefix) {
   try {
-    // Fetch entity definitions
     const entitiesUrl = `${apiUrl}EntityDefinitions?$select=LogicalName,SchemaName,DisplayName,EntitySetName&$expand=Attributes($select=LogicalName,SchemaName,AttributeType,DisplayName)`;
     
     console.log(`Fetching entity definitions from: ${entitiesUrl}`);
@@ -1384,12 +1448,59 @@ async function generateSimpleOpenApiSpec(apiUrl, token, prefix) {
     console.log(`Fetched ${response.data.value.length} entity definitions`);
     
     // Filter entities by prefix if provided
-    const entities = prefix 
+    let entities = prefix 
       ? response.data.value.filter(entity => 
           entity.SchemaName && entity.SchemaName.toLowerCase().startsWith(prefix.toLowerCase()))
       : response.data.value;
     
-    console.log(`Filtered to ${entities.length} entities with prefix: ${prefix || 'None'}`);
+    console.log(`After prefix filter: ${entities.length} entities`);
+    
+    // **NEW: Filter entities by access permissions**
+    console.log('Testing entity access permissions...');
+    const accessibleEntities = [];
+    
+    // Test access to each entity in batches to avoid timeout
+    const batchSize = 10;
+    for (let i = 0; i < entities.length; i += batchSize) {
+      const batch = entities.slice(i, i + batchSize);
+      const batchPromises = batch.map(async (entity) => {
+        if (!entity.EntitySetName) return null;
+        
+        try {
+          // Try to query the entity with $top=0 to test read access
+          const testUrl = `${apiUrl}${entity.EntitySetName}?$top=0`;
+          await axios.get(testUrl, {
+            headers: { 
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json',
+              'OData-MaxVersion': '4.0',
+              'OData-Version': '4.0'
+            },
+            timeout: 5000 // 5 second timeout per entity
+          });
+          
+          console.log(`✓ Access granted: ${entity.SchemaName}`);
+          return entity;
+        } catch (error) {
+          // If we get 401/403, user doesn't have access
+          if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+            console.log(`✗ Access denied: ${entity.SchemaName}`);
+            return null;
+          }
+          // For other errors (like entity not supporting query), include it
+          console.log(`? Unknown access: ${entity.SchemaName} (${error.message})`);
+          return entity;
+        }
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      accessibleEntities.push(...batchResults.filter(e => e !== null));
+      
+      console.log(`Processed batch ${Math.floor(i / batchSize) + 1}: ${accessibleEntities.length} accessible entities so far`);
+    }
+    
+    entities = accessibleEntities;
+    console.log(`Final accessible entities: ${entities.length}`);
     
     // Build OpenAPI spec
     const openApiSpec = {
@@ -1398,8 +1509,8 @@ async function generateSimpleOpenApiSpec(apiUrl, token, prefix) {
         title: 'Dataverse OData API',
         version: '1.0.0',
         description: prefix 
-          ? `Automatically generated API docs from Dataverse metadata (Filtered by prefix: ${prefix})`
-          : 'Automatically generated API docs from Dataverse metadata'
+          ? `Automatically generated API docs from Dataverse metadata (Filtered by prefix: ${prefix}, accessible entities only)`
+          : 'Automatically generated API docs from Dataverse metadata (accessible entities only)'
       },
       servers: [{
         url: apiUrl
@@ -1422,27 +1533,22 @@ async function generateSimpleOpenApiSpec(apiUrl, token, prefix) {
     
     // Process each entity
     entities.forEach(entity => {
-      // Skip if missing required properties
       if (!entity.SchemaName || !entity.EntitySetName) return;
       
-      // Create schema from attributes
       const properties = {};
       
       if (entity.Attributes && Array.isArray(entity.Attributes)) {
         entity.Attributes.forEach(attr => {
           if (!attr.SchemaName) return;
-          
           properties[attr.SchemaName] = attributeTypeToOpenApiType(attr.AttributeType);
         });
       }
       
-      // Add schema
       openApiSpec.components.schemas[entity.SchemaName] = {
         type: 'object',
         properties: properties
       };
       
-      // Add paths for collection
       openApiSpec.paths[`/${entity.EntitySetName}`] = {
         get: {
           summary: `Get all ${entity.SchemaName} records`,
@@ -1512,7 +1618,6 @@ async function generateSimpleOpenApiSpec(apiUrl, token, prefix) {
         }
       };
       
-      // Add path for individual record
       openApiSpec.paths[`/${entity.EntitySetName}({id})`] = {
         get: {
           summary: `Get a ${entity.SchemaName} record by ID`,
@@ -1616,8 +1721,6 @@ function attributeTypeToOpenApiType(attributeType) {
   
   return typeMap[attributeType] || { type: 'string' };
 }
-
-
 
 // Start the server
 const port = process.env.PORT || 3000;
