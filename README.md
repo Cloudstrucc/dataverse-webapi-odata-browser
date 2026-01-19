@@ -291,7 +291,7 @@ dataverse-webapi-odata-browser/
 
 Azure App Service is the recommended deployment option as it supports the full Node.js backend with authentication.
 
-#### Prerequisites
+#### Requirements
 - [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) installed
 - Azure subscription
 
@@ -391,7 +391,7 @@ Your app will be available at: `https://<APP_NAME>.azurewebsites.net`
 
 If you only need to display pre-generated Swagger documentation (no dynamic generation), you can use Azure Static Web Apps for a cost-effective, serverless solution.
 
-#### Prerequisites
+#### Prerequisites (web apps)
 - Pre-generated `swagger.json` file
 - GitHub repository
 
