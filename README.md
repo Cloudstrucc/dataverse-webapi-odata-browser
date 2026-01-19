@@ -17,7 +17,7 @@ A powerful tool to explore and document Microsoft Dataverse APIs with customizab
   - **User Identity**: Sign in with your Microsoft account and security roles
   - **Application Identity**: Use app registration for service-to-service authentication
 * 🛡️ **Permission-Based Filtering**: Only shows entities the authenticated identity can access
-* 🎨 **Customizable Branding**: Easy agency/organization theming via environment variables
+* 🎨 **Customizable Branding**:  Easy agency/organization theming via environment variables
 * 🔄 **Customizable Tenant**: Set different Azure AD tenants for different environments
 * 📱 **Responsive Design**: Works on desktop and mobile devices
 
