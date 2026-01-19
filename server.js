@@ -258,117 +258,304 @@ function checkAuthentication(req, res, next) {
 // Add this middleware to your Express app
 app.use(checkAuthentication);
 
+// Elections Canada Branding Configuration
+const EC_BRANDING = {
+  headerBgColor: '#26374a',
+  headerHeight: '80px',
+  accentColor: '#af3c43',  // Elections Canada red
+  logoAlt: 'Elections Canada',
+  // SVG logo inline for Elections Canada (maple leaf with X)
+  logoSvg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50" height="40">
+    <style>.ec-text{fill:#fff;font-family:Arial,sans-serif;font-size:14px;font-weight:bold}</style>
+    <!-- Maple Leaf Outline -->
+    <path fill="#fff" d="M15,45 L18,35 L12,32 L18,30 L15,25 L20,27 L22,20 L25,27 L30,22 L28,28 L35,30 L28,32 L32,35 L25,35 L25,45 Z"/>
+    <!-- X Mark -->
+    <g transform="translate(30,15)">
+      <rect x="0" y="8" width="20" height="4" fill="#fff" transform="rotate(-45 10 10)"/>
+      <rect x="0" y="8" width="20" height="4" fill="#fff" transform="rotate(45 10 10)"/>
+    </g>
+    <!-- Text -->
+    <text x="55" y="32" class="ec-text">Elections Canada</text>
+  </svg>`,
+  footerText: '© Elections Canada'
+};
+
+// Common CSS for Elections Canada branding
+const EC_COMMON_STYLES = `
+  :root {
+    --ec-header-bg: ${EC_BRANDING.headerBgColor};
+    --ec-accent: ${EC_BRANDING.accentColor};
+    --gc-blue: #26374a;
+    --gc-red: #af3c43;
+  }
+  
+  * {
+    box-sizing: border-box;
+  }
+  
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Noto Sans', Arial, sans-serif;
+    background-color: #f8f9fa;
+  }
+  
+  .gc-header {
+    background-color: var(--ec-header-bg);
+    padding: 0 20px;
+    height: ${EC_BRANDING.headerHeight};
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .gc-header-logo {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+  
+  .gc-header-logo svg {
+    height: 40px;
+  }
+  
+  .gc-header-logo-text {
+    color: white;
+    font-size: 1.25rem;
+    font-weight: 600;
+    border-left: 2px solid rgba(255,255,255,0.3);
+    padding-left: 15px;
+    margin-left: 5px;
+  }
+  
+  .gc-header-nav {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+  
+  .gc-header-nav a {
+    color: white;
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+  }
+  
+  .gc-header-nav a:hover {
+    background-color: rgba(255,255,255,0.1);
+  }
+  
+  .gc-red-bar {
+    height: 4px;
+    background-color: var(--gc-red);
+  }
+  
+  .gc-footer {
+    background-color: var(--ec-header-bg);
+    color: white;
+    padding: 20px;
+    text-align: center;
+    font-size: 0.85rem;
+    margin-top: auto;
+  }
+  
+  .gc-footer a {
+    color: white;
+    text-decoration: underline;
+  }
+  
+  .ec-logo-img {
+    height: 45px;
+    width: auto;
+  }
+  
+  .badge-ec {
+    background-color: var(--gc-red);
+    color: white;
+  }
+`;
+
 // Home route - Login or Dashboard
 app.get('/', (req, res) => {
   if (!req.session.token) {
-    // Login page with both authentication options
+    // Login page with Elections Canada branding
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Dataverse API Explorer</title>
+        <title>API Explorer - Elections Canada</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
-          html, body { height: 100%; }
-          body {
+          ${EC_COMMON_STYLES}
+          
+          html, body {
+            height: 100%;
+          }
+          
+          .page-wrapper {
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+          }
+          
+          .main-content {
+            flex: 1;
             display: flex;
             align-items: center;
-            padding-top: 40px;
-            padding-bottom: 40px;
-            background-color: #f5f5f5;
+            justify-content: center;
+            padding: 40px 20px;
           }
+          
           .form-signin {
             width: 100%;
-            max-width: 450px;
-            padding: 15px;
-            margin: auto;
+            max-width: 480px;
           }
-          .brand-logo {
-            height: 60px;
-            margin-bottom: 1.5rem;
-          }
+          
           .auth-divider {
             display: flex;
             align-items: center;
             text-align: center;
             margin: 1.5rem 0;
           }
+          
           .auth-divider::before,
           .auth-divider::after {
             content: '';
             flex: 1;
             border-bottom: 1px solid #dee2e6;
           }
+          
           .auth-divider span {
             padding: 0 1rem;
             color: #6c757d;
             font-size: 0.875rem;
           }
+          
           .auth-option {
             margin-bottom: 1rem;
           }
+          
           .auth-option .btn {
             position: relative;
             padding-left: 2.5rem;
           }
+          
           .auth-option .btn-icon {
             position: absolute;
             left: 1rem;
             top: 50%;
             transform: translateY(-50%);
           }
-          .filter-badge {
-            background-color: #17a2b8;
+          
+          .btn-ec-primary {
+            background-color: var(--gc-blue);
+            border-color: var(--gc-blue);
             color: white;
-            padding: 0.25rem 0.5rem;
+          }
+          
+          .btn-ec-primary:hover {
+            background-color: #1c2a38;
+            border-color: #1c2a38;
+            color: white;
+          }
+          
+          .btn-ec-secondary {
+            background-color: var(--gc-red);
+            border-color: var(--gc-red);
+            color: white;
+          }
+          
+          .btn-ec-secondary:hover {
+            background-color: #8f3238;
+            border-color: #8f3238;
+            color: white;
+          }
+          
+          .filter-badge {
+            background-color: var(--gc-red);
+            color: white;
+            padding: 0.25rem 0.75rem;
             border-radius: 0.25rem;
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             margin-top: 0.5rem;
             display: inline-block;
           }
+          
+          .card {
+            border: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          }
+          
+          .page-title {
+            color: var(--gc-blue);
+            font-weight: 600;
+          }
         </style>
       </head>
-      <body class="text-center">
-        <main class="form-signin">
-          <h1 class="h3 mb-3 fw-normal">Dataverse API Explorer</h1>
-          <p class="mb-3 text-muted">Access documentation for your Dataverse environment APIs</p>
+      <body>
+        <div class="page-wrapper">
+          <header class="gc-header">
+            <div class="gc-header-logo">
+              <span style="color: white; font-size: 1.25rem; font-weight: 600;">Elections Canada</span>
+              <span class="gc-header-logo-text">API Explorer</span>
+            </div>
+            <nav class="gc-header-nav">
+              <a href="https://www.elections.ca" target="_blank">Elections.ca</a>
+            </nav>
+          </header>
+          <div class="gc-red-bar"></div>
           
-          ${PATH_FILTER ? `<div class="filter-badge">🔍 Path Filter: "${PATH_FILTER}"</div>` : ''}
-          
-          <div class="card p-3 bg-light mt-3">
-            <form method="POST" action="/set-tenant" class="text-start mb-3">
-              <div class="form-floating mb-3">
-                <input type="text" class="form-control" id="tenantId" name="tenantId" 
-                       placeholder="00000000-0000-0000-0000-000000000000" 
-                       value="${azureConfig.tenantId}">
-                <label for="tenantId">Azure AD Tenant ID (Optional)</label>
+          <main class="main-content">
+            <div class="form-signin text-center">
+              <h1 class="h3 mb-3 page-title">Dataverse API Explorer</h1>
+              <p class="mb-3 text-muted">Access documentation for Elections Canada Dataverse APIs</p>
+              
+              ${PATH_FILTER ? `<div class="filter-badge">🔍 Path Filter: "${PATH_FILTER}"</div>` : ''}
+              
+              <div class="card p-4 mt-3">
+                <form method="POST" action="/set-tenant" class="text-start mb-3">
+                  <div class="form-floating mb-3">
+                    <input type="text" class="form-control" id="tenantId" name="tenantId" 
+                           placeholder="00000000-0000-0000-0000-000000000000" 
+                           value="${azureConfig.tenantId}">
+                    <label for="tenantId">Azure AD Tenant ID (Optional)</label>
+                  </div>
+                  <button type="submit" class="w-100 btn btn-outline-secondary">Set Tenant ID</button>
+                </form>
+                
+                <div class="auth-divider">
+                  <span>Choose Authentication Method</span>
+                </div>
+                
+                <div class="auth-option">
+                  <a href="/auth/login" class="w-100 btn btn-lg btn-ec-primary">
+                    <span class="btn-icon">👤</span>
+                    Sign in as User
+                  </a>
+                  <small class="text-muted d-block mt-1">Uses your user account and security roles</small>
+                </div>
+                
+                <div class="auth-option">
+                  <a href="/auth/app-login" class="w-100 btn btn-lg btn-ec-secondary">
+                    <span class="btn-icon">🔑</span>
+                    Sign in as Application
+                  </a>
+                  <small class="text-muted d-block mt-1">Uses app registration identity and permissions</small>
+                </div>
               </div>
-              <button type="submit" class="w-100 btn btn-secondary">Set Tenant ID</button>
-            </form>
-            
-            <div class="auth-divider">
-              <span>Choose Authentication Method</span>
             </div>
-            
-            <div class="auth-option">
-              <a href="/auth/login" class="w-100 btn btn-lg btn-primary">
-                <span class="btn-icon">👤</span>
-                Sign in as User
-              </a>
-              <small class="text-muted d-block mt-1">Uses your user account and security roles</small>
-            </div>
-            
-            <div class="auth-option">
-              <a href="/auth/app-login" class="w-100 btn btn-lg btn-success">
-                <span class="btn-icon">🔑</span>
-                Sign in as Application
-              </a>
-              <small class="text-muted d-block mt-1">Uses app registration identity and permissions</small>
-            </div>
-          </div>
-        </main>
+          </main>
+          
+          <footer class="gc-footer">
+            <div>${EC_BRANDING.footerText}</div>
+          </footer>
+        </div>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
       </body>
       </html>
@@ -377,121 +564,186 @@ app.get('/', (req, res) => {
     // Show auth type in dashboard
     const authType = req.session.authType || 'user';
     const authBadge = authType === 'application' 
-      ? '<span class="badge bg-success">Application Identity</span>' 
+      ? '<span class="badge badge-ec">Application Identity</span>' 
       : '<span class="badge bg-primary">User Identity</span>';
     
-    // Dashboard page with publisher dropdown
+    // Dashboard page with Elections Canada branding
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Dataverse API Explorer</title>
+        <title>API Explorer - Elections Canada</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
-          html, body { height: 100%; }
-          body {
+          ${EC_COMMON_STYLES}
+          
+          html, body {
+            height: 100%;
+          }
+          
+          .page-wrapper {
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+          }
+          
+          .main-content {
+            flex: 1;
             display: flex;
             align-items: center;
-            padding-top: 40px;
-            padding-bottom: 40px;
-            background-color: #f5f5f5;
+            justify-content: center;
+            padding: 40px 20px;
           }
-          .container {
+          
+          .container-form {
             width: 100%;
             max-width: 600px;
-            padding: 15px;
-            margin: auto;
           }
+          
           .publisher-loading {
             display: none;
             margin-left: 10px;
           }
+          
           .alert {
             margin-bottom: 20px;
           }
+          
           .auth-status {
             text-align: center;
             margin-bottom: 1rem;
           }
+          
           .filter-info {
-            background-color: #d1ecf1;
-            border: 1px solid #bee5eb;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
             border-radius: 0.25rem;
             padding: 0.75rem;
             margin-bottom: 1rem;
             font-size: 0.875rem;
           }
+          
           .filter-info code {
             background-color: #fff;
             padding: 0.125rem 0.25rem;
             border-radius: 0.125rem;
+            color: var(--gc-red);
+          }
+          
+          .card {
+            border: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          }
+          
+          .card-title {
+            color: var(--gc-blue);
+            font-weight: 600;
+          }
+          
+          .btn-ec-primary {
+            background-color: var(--gc-blue);
+            border-color: var(--gc-blue);
+            color: white;
+          }
+          
+          .btn-ec-primary:hover {
+            background-color: #1c2a38;
+            border-color: #1c2a38;
+            color: white;
+          }
+          
+          .page-title {
+            color: var(--gc-blue);
+            font-weight: 600;
+          }
+          
+          .badge-ec {
+            background-color: var(--gc-red) !important;
+            color: white;
           }
         </style>
       </head>
       <body>
-        <div class="container">
-          <div class="auth-status">
-            <small class="text-muted">Authenticated with: ${authBadge}</small>
-          </div>
+        <div class="page-wrapper">
+          <header class="gc-header">
+            <div class="gc-header-logo">
+              <span style="color: white; font-size: 1.25rem; font-weight: 600;">Elections Canada</span>
+              <span class="gc-header-logo-text">API Explorer</span>
+            </div>
+            <nav class="gc-header-nav">
+              <a href="/">Home</a>
+              <a href="/auth/logout">Sign Out</a>
+            </nav>
+          </header>
+          <div class="gc-red-bar"></div>
           
-          <h1 class="h3 mb-3 fw-normal text-center">Generate API Documentation</h1>
-          
-          ${PATH_FILTER ? `
-          <div class="filter-info">
-            <strong>🔍 Path Filter Active:</strong> Only paths containing <code>${PATH_FILTER}</code> will be shown in the generated documentation.
-          </div>
-          ` : ''}
-          
-          <div id="statusMessages"></div>
-          
-          <div class="card">
-            <div class="card-body">
-              <h5 class="card-title mb-3">Enter Your Dataverse Environment URL</h5>
-              <form method="POST" action="/generate-docs" class="p-2" id="apiForm">
-                <div class="form-floating mb-3">
-                  <input type="text" class="form-control" id="envUrl" name="envUrl" 
-                         placeholder="https://your-org.crm.dynamics.com/" 
-                         value="${process.env.dataverse_url || ''}" required>
-                  <label for="envUrl">Dataverse Environment URL</label>
-                </div>
-                <div class="mb-3">
-                  <label for="publisherDropdown" class="form-label">Publisher (Optional)</label>
-                  <div class="input-group">
-                    <select class="form-select" id="publisherDropdown" name="publisherDropdown">
-                      <option value="">All Publishers (No Filter)</option>
-                    </select>
-                    <button class="btn btn-outline-secondary" type="button" id="loadPublishers">
-                      Load Publishers
+          <main class="main-content">
+            <div class="container-form">
+              <div class="auth-status">
+                <small class="text-muted">Authenticated with: ${authBadge}</small>
+              </div>
+              
+              <h1 class="h3 mb-3 page-title text-center">Generate API Documentation</h1>
+              
+              ${PATH_FILTER ? `
+              <div class="filter-info">
+                <strong>🔍 Path Filter Active:</strong> Only paths containing <code>${PATH_FILTER}</code> will be shown in the generated documentation.
+              </div>
+              ` : ''}
+              
+              <div id="statusMessages"></div>
+              
+              <div class="card">
+                <div class="card-body">
+                  <h5 class="card-title mb-3">Enter Your Dataverse Environment URL</h5>
+                  <form method="POST" action="/generate-docs" class="p-2" id="apiForm">
+                    <div class="form-floating mb-3">
+                      <input type="text" class="form-control" id="envUrl" name="envUrl" 
+                             placeholder="https://your-org.crm.dynamics.com/" 
+                             value="${process.env.dataverse_url || ''}" required>
+                      <label for="envUrl">Dataverse Environment URL</label>
+                    </div>
+                    <div class="mb-3">
+                      <label for="publisherDropdown" class="form-label">Publisher (Optional)</label>
+                      <div class="input-group">
+                        <select class="form-select" id="publisherDropdown" name="publisherDropdown">
+                          <option value="">All Publishers (No Filter)</option>
+                        </select>
+                        <button class="btn btn-outline-secondary" type="button" id="loadPublishers">
+                          Load Publishers
+                        </button>
+                        <div class="spinner-border text-primary publisher-loading" role="status" id="publisherLoading">
+                          <span class="visually-hidden">Loading...</span>
+                        </div>
+                      </div>
+                      <div class="form-text">
+                        Filter tables by publisher. The prefix will be automatically filled in.
+                      </div>
+                      <input type="hidden" id="prefix" name="prefix" value="">
+                    </div>
+                    <button class="w-100 btn btn-lg btn-ec-primary" type="submit">Generate API Docs</button>
+                  </form>
+                  
+                  <!-- Debug Section -->
+                  <div class="mt-3 pt-3 border-top">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="checkIdentity()">
+                      🔍 Check Current Identity
                     </button>
-                    <div class="spinner-border text-primary publisher-loading" role="status" id="publisherLoading">
-                      <span class="visually-hidden">Loading...</span>
+                    <div id="identityInfo" class="mt-2" style="display: none;">
+                      <pre class="bg-light p-2 small" style="max-height: 200px; overflow-y: auto;"></pre>
                     </div>
                   </div>
-                  <div class="form-text">
-                    Filter tables by publisher. The prefix will be automatically filled in.
-                  </div>
-                  <input type="hidden" id="prefix" name="prefix" value="">
-                </div>
-                <button class="w-100 btn btn-lg btn-primary" type="submit">Generate API Docs</button>
-              </form>
-              
-              <!-- Debug Section -->
-              <div class="mt-3 pt-3 border-top">
-                <button class="btn btn-sm btn-outline-info" onclick="checkIdentity()">
-                  🔍 Check Current Identity
-                </button>
-                <div id="identityInfo" class="mt-2" style="display: none;">
-                  <pre class="bg-light p-2 small" style="max-height: 200px; overflow-y: auto;"></pre>
                 </div>
               </div>
             </div>
-          </div>
+          </main>
           
-          <div class="mt-3 text-center">
-            <a href="/auth/logout" class="text-muted">Sign Out</a>
-          </div>
+          <footer class="gc-footer">
+            <div>${EC_BRANDING.footerText}</div>
+          </footer>
         </div>
         
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
@@ -554,11 +806,8 @@ app.get('/', (req, res) => {
                 .then(response => {
                   if (!response.ok) {
                     return response.json().then(errorData => {
-                      // Check if we need to redirect for authentication
                       if (response.status === 401 && errorData.redirect) {
-                        // Store current URL to return to after login
                         sessionStorage.setItem('returnUrl', window.location.href);
-                        // Redirect to login
                         window.location.href = errorData.redirect;
                         throw new Error('Authentication required. Redirecting to login...');
                       }
@@ -568,27 +817,21 @@ app.get('/', (req, res) => {
                   return response.json();
                 })
                 .then(data => {
-                  // Clear dropdown except first option
                   while (publisherDropdown.options.length > 1) {
                     publisherDropdown.remove(1);
                   }
                   
-                  // Add publishers to dropdown
                   if (data.publishers && data.publishers.length > 0) {
                     data.publishers.forEach(publisher => {
                       const option = document.createElement('option');
                       option.value = publisher.customizationprefix || '';
-                      
-                      // Create display text with prefix
                       let displayText = publisher.friendlyname || publisher.uniquename || '';
                       if (publisher.customizationprefix) {
                         displayText += ' (' + publisher.customizationprefix + '_)';
                       }
-                      
                       option.textContent = displayText;
                       publisherDropdown.appendChild(option);
                     });
-                    
                     showStatusMessage(\`Successfully loaded \${data.publishers.length} publishers\`, 'success');
                   } else {
                     showStatusMessage('No publishers found in this environment', 'warning');
@@ -596,41 +839,27 @@ app.get('/', (req, res) => {
                 })
                 .catch(error => {
                   console.error('Error:', error);
-                  // Don't show alert if we're redirecting for authentication
                   if (!error.message.includes('Redirecting to login')) {
                     showStatusMessage('Error loading publishers: ' + error.message, 'danger');
                   }
                 })
                 .finally(() => {
-                  // Hide loading spinner
                   publisherLoading.style.display = 'none';
                   loadPublishersBtn.disabled = false;
                   loadPublishersBtn.textContent = 'Load Publishers';
                 });
             });
             
-            // Update hidden prefix input when publisher selection changes
             publisherDropdown.addEventListener('change', function() {
               const selectedPrefix = this.value;
-              // Add trailing underscore if needed
               prefixInput.value = selectedPrefix ? (selectedPrefix + '_') : '';
-              
               if (selectedPrefix) {
                 showStatusMessage(\`Selected publisher prefix: \${selectedPrefix}_\`, 'info');
               }
             });
             
-            // Form submission
-            apiForm.addEventListener('submit', function(e) {
-              // Nothing special needed here, the form will submit normally
-              // The hidden prefix input will contain the correct value
-            });
-            
-            // Check if we're returning from a login redirect
             if (sessionStorage.getItem('returnUrl')) {
-              // We've returned from authentication, clear the stored URL
               sessionStorage.removeItem('returnUrl');
-              // Show a message to the user
               showStatusMessage('Authentication successful! You can now load publishers.', 'success');
             }
           });
@@ -1019,51 +1248,128 @@ app.post('/generate-docs', async (req, res) => {
   const prefix = req.body.prefix || '';
   
   try {
-    // Show loading page
+    // Show loading page with Elections Canada branding
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Generating Documentation...</title>
+        <title>Generating Documentation - Elections Canada</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
-          html, body { height: 100%; }
-          body {
+          :root {
+            --ec-header-bg: #26374a;
+            --gc-blue: #26374a;
+            --gc-red: #af3c43;
+          }
+          
+          * { box-sizing: border-box; }
+          body { margin: 0; padding: 0; font-family: 'Noto Sans', Arial, sans-serif; background-color: #f8f9fa; }
+          
+          .gc-header {
+            background-color: var(--ec-header-bg);
+            padding: 0 20px;
+            height: 70px;
             display: flex;
             align-items: center;
-            padding-top: 40px;
-            padding-bottom: 40px;
-            background-color: #f5f5f5;
           }
+          
+          .gc-header img { height: 40px; }
+          
+          .gc-header-logo-text {
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-left: 2px solid rgba(255,255,255,0.3);
+            padding-left: 15px;
+            margin-left: 15px;
+          }
+          
+          .gc-red-bar {
+            height: 4px;
+            background-color: var(--gc-red);
+          }
+          
+          html, body { height: 100%; }
+          
+          .page-wrapper {
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+          }
+          
+          .main-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+          }
+          
           .loading-container {
             width: 100%;
             max-width: 500px;
-            padding: 15px;
-            margin: auto;
             text-align: center;
           }
+          
           .spinner-border {
             width: 5rem;
             height: 5rem;
             margin-bottom: 1.5rem;
+            color: var(--gc-blue);
+          }
+          
+          .page-title {
+            color: var(--gc-blue);
+            font-weight: 600;
+          }
+          
+          .badge-ec {
+            background-color: var(--gc-red);
+          }
+          
+          .progress-bar {
+            background-color: var(--gc-blue);
+          }
+          
+          .gc-footer {
+            background-color: var(--ec-header-bg);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 0.85rem;
           }
         </style>
       </head>
       <body>
-        <main class="loading-container">
-          <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-          </div>
-          <h1 class="h3 mb-3 fw-normal">Generating API Documentation</h1>
-          <p class="text-muted">Fetching metadata from Dataverse and processing...</p>
-          ${prefix ? `<p class="badge bg-info">Filtering by prefix: ${prefix}</p>` : ''}
-          ${PATH_FILTER ? `<p class="badge bg-secondary">Path filter: ${PATH_FILTER}</p>` : ''}
-          <div class="progress mt-4">
-            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
-          </div>
-        </main>
+        <div class="page-wrapper">
+          <header class="gc-header">
+            <span style="color: white; font-size: 1.25rem; font-weight: 700;">Elections Canada</span>
+            <span class="gc-header-logo-text">API Explorer</span>
+          </header>
+          <div class="gc-red-bar"></div>
+          
+          <main class="main-content">
+            <div class="loading-container">
+              <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <h1 class="h3 mb-3 page-title">Generating API Documentation</h1>
+              <p class="text-muted">Fetching metadata from Dataverse and processing...</p>
+              ${prefix ? `<p class="badge badge-ec text-white">Filtering by prefix: ${prefix}</p>` : ''}
+              ${PATH_FILTER ? `<p class="badge bg-secondary ms-1">Path filter: ${PATH_FILTER}</p>` : ''}
+              <div class="progress mt-4">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+              </div>
+            </div>
+          </main>
+          
+          <footer class="gc-footer">
+            <div>© Elections Canada</div>
+          </footer>
+        </div>
         <script>
           fetch('/api/generate-openapi', {
             method: 'POST',
@@ -1334,70 +1640,130 @@ app.get('/api-docs', (req, res) => {
     <html lang="en">
     <head>
       <meta charset="UTF-8">
-      <title>Dataverse API Documentation</title>
+      <title>API Documentation - Elections Canada</title>
       <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
+      <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
       <style>
+        :root {
+          --ec-header-bg: #26374a;
+          --gc-blue: #26374a;
+          --gc-red: #af3c43;
+        }
+        
         html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
         *, *:before, *:after { box-sizing: inherit; }
-        body { margin: 0; padding: 0; }
+        body { margin: 0; padding: 0; font-family: 'Noto Sans', Arial, sans-serif; }
         .swagger-ui .topbar { display: none; }
         
-        .api-navbar {
-          background-color: #007bff;
-          padding: 1rem;
-          color: white;
+        .gc-header {
+          background-color: var(--ec-header-bg);
+          padding: 0 20px;
+          height: 70px;
           display: flex;
-          justify-content: space-between;
           align-items: center;
+          justify-content: space-between;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .api-navbar a {
+        
+        .gc-header-logo {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+        }
+        
+        .gc-header-logo img {
+          height: 40px;
+        }
+        
+        .gc-header-logo-text {
+          color: white;
+          font-size: 1.1rem;
+          font-weight: 600;
+          border-left: 2px solid rgba(255,255,255,0.3);
+          padding-left: 15px;
+          margin-left: 5px;
+        }
+        
+        .gc-header-nav {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        
+        .gc-header-nav a {
           color: white;
           text-decoration: none;
-          padding: 0.5rem 1rem;
+          padding: 8px 16px;
           border-radius: 4px;
-        }
-        .api-navbar a:hover {
-          background-color: rgba(255, 255, 255, 0.1);
-        }
-        .prefix-filter {
-          background-color: #e9f7ff;
-          padding: 0.75rem;
-          margin-top: 0;
-          border-bottom: 1px solid #ccc;
           font-size: 0.9rem;
+          transition: background-color 0.2s;
         }
+        
+        .gc-header-nav a:hover {
+          background-color: rgba(255,255,255,0.1);
+        }
+        
+        .gc-red-bar {
+          height: 4px;
+          background-color: var(--gc-red);
+        }
+        
+        .auth-badge {
+          background-color: var(--gc-red);
+          color: white;
+          padding: 4px 10px;
+          border-radius: 4px;
+          font-size: 0.8rem;
+          margin-left: 10px;
+        }
+        
+        .auth-badge.user {
+          background-color: #0d6efd;
+        }
+        
+        .info-bar {
+          padding: 0.75rem 1rem;
+          font-size: 0.9rem;
+          border-bottom: 1px solid #ddd;
+        }
+        
+        .prefix-filter {
+          background-color: #e7f1ff;
+        }
+        
         .path-filter {
           background-color: #d4edda;
-          padding: 0.75rem;
-          margin-top: 0;
-          border-bottom: 1px solid #c3e6cb;
-          font-size: 0.9rem;
         }
+        
         .token-helper {
           background-color: #fff3cd;
-          border: 1px solid #ffc107;
+          border-bottom: 1px solid #ffc107;
           padding: 1rem;
-          margin: 0;
           display: flex;
           justify-content: space-between;
           align-items: center;
         }
+        
         .token-helper button {
-          background-color: #007bff;
+          background-color: var(--gc-blue);
           color: white;
           border: none;
           padding: 0.5rem 1rem;
           border-radius: 4px;
           cursor: pointer;
           margin-left: 0.5rem;
+          font-family: 'Noto Sans', Arial, sans-serif;
         }
+        
         .token-helper button:hover {
-          background-color: #0056b3;
+          background-color: #1c2a38;
         }
+        
         .token-helper button:disabled {
           background-color: #6c757d;
           cursor: not-allowed;
         }
+        
         .token-display {
           font-family: monospace;
           font-size: 0.85rem;
@@ -1409,10 +1775,12 @@ app.get('/api-docs', (req, res) => {
           max-height: 100px;
           overflow-y: auto;
         }
+        
         .token-actions {
           display: flex;
           gap: 0.5rem;
         }
+        
         .toast-notification {
           position: fixed;
           top: 20px;
@@ -1424,30 +1792,48 @@ app.get('/api-docs', (req, res) => {
           box-shadow: 0 4px 6px rgba(0,0,0,0.1);
           z-index: 10000;
           display: none;
+          font-family: 'Noto Sans', Arial, sans-serif;
+        }
+        
+        /* Override some Swagger UI styles */
+        .swagger-ui .info .title {
+          color: var(--gc-blue);
+        }
+        
+        .swagger-ui .btn.execute {
+          background-color: var(--gc-blue);
+          border-color: var(--gc-blue);
+        }
+        
+        .swagger-ui .btn.execute:hover {
+          background-color: #1c2a38;
         }
       </style>
     </head>
     <body>
       <div id="toast" class="toast-notification"></div>
       
-      <div class="api-navbar">
-        <div>
-          <span>Dataverse API Documentation - ${authBadge}</span>
+      <header class="gc-header">
+        <div class="gc-header-logo">
+          <span style="color: white; font-size: 1.25rem; font-weight: 700;">Elections Canada</span>
+          <span class="gc-header-logo-text">API Documentation</span>
+          <span class="auth-badge ${authType === 'application' ? '' : 'user'}">${authType === 'application' ? 'Application' : 'User'}</span>
         </div>
-        <div>
+        <nav class="gc-header-nav">
           <a href="/">Home</a>
           <a href="/auth/logout">Sign Out</a>
-        </div>
-      </div>
+        </nav>
+      </header>
+      <div class="gc-red-bar"></div>
 
       ${prefix ? `
-      <div class="prefix-filter">
+      <div class="info-bar prefix-filter">
         <strong>📦 Entity prefix filter:</strong> ${prefix}
       </div>
       ` : ''}
       
       ${PATH_FILTER ? `
-      <div class="path-filter">
+      <div class="info-bar path-filter">
         <strong>🔍 Path filter:</strong> <code>${PATH_FILTER}</code> — Showing ${pathCount} matching paths
       </div>
       ` : ''}
@@ -1504,13 +1890,11 @@ app.get('/api-docs', (req, res) => {
             copyBtn.style.display = 'inline-block';
             hideBtn.style.display = 'inline-block';
             
-            showToast('Token retrieved successfully! Check browser console for full token.');
+            showToast('Token retrieved successfully!');
             console.log('='.repeat(80));
             console.log('BEARER TOKEN (for Swagger Authorize):');
             console.log('='.repeat(80));
             console.log(currentToken);
-            console.log('='.repeat(80));
-            console.log('Token expires:', data.expires);
             console.log('='.repeat(80));
           } catch (error) {
             console.error('Error fetching token:', error);
@@ -1529,7 +1913,6 @@ app.get('/api-docs', (req, res) => {
           try {
             await navigator.clipboard.writeText(currentToken);
             showToast('✓ Token copied to clipboard!');
-            console.log('Token copied to clipboard');
           } catch (error) {
             console.error('Error copying token:', error);
             showToast('Failed to copy token');
@@ -1933,15 +2316,15 @@ const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`
 ╔════════════════════════════════════════════════════════════╗
-║  Dataverse API Explorer                                    ║
+║  Elections Canada - Dataverse API Explorer                 ║
 ║  Server running on http://localhost:${port}                     ║
 ║                                                            ║
 ║  Environment information:                                  ║
 ║  - Dataverse URL: ${process.env.dataverse_url ? 'Configured ✓' : 'Not set ✗'}                       ║
 ║  - Client Secret: ${process.env.client_secret ? 'Configured ✓' : 'Not set ✗'}                       ║
 ║  - Session Secret: ${process.env.session_secret ? 'Configured ✓' : 'Not set ✗'}                     ║
-║  - Tenant ID: ${process.env.tenant_id || 'Default'}                            ║
-║  - Path Filter: ${PATH_FILTER || 'None (showing all paths)'}                   ║
+║  - Tenant ID: ${(process.env.tenant_id || 'Default').substring(0, 20).padEnd(20)}               ║
+║  - Path Filter: ${(PATH_FILTER || 'None').substring(0, 18).padEnd(18)}                 ║
 ╚════════════════════════════════════════════════════════════╝
 `);
 });
