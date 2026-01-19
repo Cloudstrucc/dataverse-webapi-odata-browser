@@ -9,6 +9,7 @@ const msal = require('@azure/msal-node');
 const fs = require('fs');
 const path = require('path');
 const xml2js = require('xml2js');
+const multer = require('multer');
 
 const app = express();
 
@@ -23,6 +24,31 @@ const publicDir = path.join(__dirname, 'public');
 if (!fs.existsSync(publicDir)) {
   fs.mkdirSync(publicDir);
 }
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    ];
+    
+    const allowedExtensions = ['.pdf', '.docx', '.xlsx', '.pptx'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    
+    if (allowedMimes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Allowed types: PDF, DOCX, XLSX, PPTX'));
+    }
+  }
+});
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -223,7 +249,7 @@ let openApiSpec = null;
 // Authentication middleware to check token validity
 function checkAuthentication(req, res, next) {
   // Skip authentication for public routes
-  const publicPaths = ['/', '/auth/login', '/auth/callback', '/auth/logout', '/auth/app-login'];
+  const publicPaths = ['/', '/auth/login', '/auth/callback', '/auth/logout', '/auth/app-login', '/file-converter', '/api/public/file-to-base64'];
   if (publicPaths.includes(req.path)) {
     return next();
   }
@@ -1957,6 +1983,7 @@ app.get('/swagger.json', (req, res) => {
   res.json(openApiSpec);
 });
 
+
 // API endpoint to get current token
 app.get('/api/current-token', (req, res) => {
   if (!req.session.token) {
@@ -2293,6 +2320,615 @@ function attributeTypeToOpenApiType(attributeType) {
   
   return typeMap[attributeType] || { type: 'string' };
 }
+// Helper function for formatting bytes
+function formatBytes(bytes, decimals = 2) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+// =============================================================================
+// PUBLIC FILE TO BASE64 CONVERTER (No Authentication Required)
+// =============================================================================
+
+// Public file converter UI route
+app.get('/file-converter', (req, res) => {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>File to Base64 Converter - ${AGENCY_NAME}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --agency-header-bg: ${AGENCY_BRANDING.headerBgColor};
+      --agency-accent: ${AGENCY_BRANDING.accentColor};
+    }
+    * { box-sizing: border-box; }
+    body { 
+      margin: 0; 
+      padding: 0; 
+      font-family: 'Noto Sans', Arial, sans-serif; 
+      background-color: #f8f9fa;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .gc-header {
+      background-color: var(--agency-header-bg);
+      padding: 0 20px;
+      height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .gc-header-logo {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .gc-header-logo-name {
+      color: white;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    .gc-header-logo-text {
+      color: white;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border-left: 2px solid rgba(255,255,255,0.3);
+      padding-left: 15px;
+      margin-left: 5px;
+    }
+    .gc-header-nav a {
+      color: white;
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      transition: background-color 0.2s;
+    }
+    .gc-header-nav a:hover {
+      background-color: rgba(255,255,255,0.1);
+    }
+    .gc-red-bar {
+      height: 4px;
+      background-color: var(--agency-accent);
+    }
+    .main-content {
+      flex: 1;
+      padding: 40px 20px;
+    }
+    .converter-container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .card {
+      border: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border-radius: 8px;
+    }
+    .card-header {
+      background-color: var(--agency-header-bg);
+      color: white;
+      font-weight: 600;
+      border-radius: 8px 8px 0 0 !important;
+    }
+    .upload-zone {
+      border: 3px dashed #dee2e6;
+      border-radius: 8px;
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background-color: #fafafa;
+    }
+    .upload-zone:hover {
+      border-color: var(--agency-header-bg);
+      background-color: #f0f4f8;
+    }
+    .upload-zone.dragover {
+      border-color: var(--agency-accent);
+      background-color: #fff5f5;
+    }
+    .upload-zone.has-file {
+      border-color: #28a745;
+      background-color: #f0fff4;
+    }
+    .upload-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+    .file-input {
+      display: none;
+    }
+    .file-info {
+      display: none;
+      margin-top: 1rem;
+      padding: 1rem;
+      background-color: #e7f1ff;
+      border-radius: 8px;
+    }
+    .file-info.show {
+      display: block;
+    }
+    .btn-convert {
+      background-color: var(--agency-header-bg);
+      border-color: var(--agency-header-bg);
+      color: white;
+      padding: 12px 30px;
+      font-size: 1.1rem;
+    }
+    .btn-convert:hover {
+      background-color: #1c2a38;
+      border-color: #1c2a38;
+      color: white;
+    }
+    .btn-convert:disabled {
+      background-color: #6c757d;
+      border-color: #6c757d;
+    }
+    .result-section {
+      display: none;
+      margin-top: 2rem;
+    }
+    .result-section.show {
+      display: block;
+    }
+    .base64-output {
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      background-color: #1e1e1e;
+      color: #d4d4d4;
+      padding: 1rem;
+      border-radius: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+    .copy-btn {
+      background-color: var(--agency-accent);
+      border-color: var(--agency-accent);
+      color: white;
+    }
+    .copy-btn:hover {
+      opacity: 0.9;
+      color: white;
+    }
+    .stats-badge {
+      background-color: var(--agency-header-bg);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      margin-right: 0.5rem;
+      font-size: 0.85rem;
+    }
+    .loading-spinner {
+      display: none;
+    }
+    .loading-spinner.show {
+      display: inline-block;
+    }
+    .gc-footer {
+      background-color: var(--agency-header-bg);
+      color: white;
+      padding: 20px;
+      text-align: center;
+      font-size: 0.85rem;
+      margin-top: auto;
+    }
+    .toast-notification {
+      position: fixed;
+      top: 90px;
+      right: 20px;
+      padding: 1rem 1.5rem;
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 10000;
+      display: none;
+      font-weight: 500;
+    }
+    .toast-notification.success {
+      background-color: #28a745;
+      color: white;
+    }
+    .toast-notification.error {
+      background-color: #dc3545;
+      color: white;
+    }
+    .allowed-types {
+      color: #6c757d;
+      font-size: 0.9rem;
+    }
+    .output-tabs .nav-link {
+      color: var(--agency-header-bg);
+    }
+    .output-tabs .nav-link.active {
+      background-color: var(--agency-header-bg);
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div id="toast" class="toast-notification"></div>
+  
+  <header class="gc-header">
+    <div class="gc-header-logo">
+      <span class="gc-header-logo-name">${AGENCY_NAME}</span>
+      <span class="gc-header-logo-text">File to Base64 Converter</span>
+    </div>
+    <nav class="gc-header-nav">
+      <a href="/">API Explorer</a>
+    </nav>
+  </header>
+  <div class="gc-red-bar"></div>
+  
+  <main class="main-content">
+    <div class="converter-container">
+      <div class="card">
+        <div class="card-header py-3">
+          <h5 class="mb-0">📄 Convert File to Base64</h5>
+        </div>
+        <div class="card-body p-4">
+          <div class="upload-zone" id="uploadZone">
+            <div class="upload-icon">📁</div>
+            <h5>Drag & Drop your file here</h5>
+            <p class="text-muted mb-2">or click to browse</p>
+            <p class="allowed-types">
+              <strong>Allowed:</strong> PDF, DOCX, XLSX, PPTX (Max 50MB)
+            </p>
+            <input type="file" id="fileInput" class="file-input" 
+                   accept=".pdf,.docx,.xlsx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation">
+          </div>
+          
+          <div class="file-info" id="fileInfo">
+            <div class="d-flex align-items-center justify-content-between">
+              <div>
+                <strong id="fileName">-</strong>
+                <br>
+                <small class="text-muted">
+                  <span id="fileSize">-</span> • <span id="fileType">-</span>
+                </small>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-danger" id="clearFile">
+                ✕ Clear
+              </button>
+            </div>
+          </div>
+          
+          <div class="text-center mt-4">
+            <button type="button" class="btn btn-convert btn-lg" id="convertBtn" disabled>
+              <span class="loading-spinner spinner-border spinner-border-sm me-2" role="status"></span>
+              Convert to Base64
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="result-section" id="resultSection">
+        <div class="card">
+          <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">✅ Conversion Result</h5>
+            <div>
+              <span class="stats-badge" id="resultSize">-</span>
+              <span class="stats-badge" id="resultLength">-</span>
+            </div>
+          </div>
+          <div class="card-body p-4">
+            <ul class="nav nav-tabs output-tabs mb-3" id="outputTabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="base64-tab" data-bs-toggle="tab" data-bs-target="#base64Content" type="button">
+                  Base64 String
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="datauri-tab" data-bs-toggle="tab" data-bs-target="#datauriContent" type="button">
+                  Data URI
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="json-tab" data-bs-toggle="tab" data-bs-target="#jsonContent" type="button">
+                  JSON Response
+                </button>
+              </li>
+            </ul>
+            
+            <div class="tab-content" id="outputTabContent">
+              <div class="tab-pane fade show active" id="base64Content" role="tabpanel">
+                <div class="base64-output" id="base64Output"></div>
+                <button class="btn copy-btn mt-3" onclick="copyToClipboard('base64')">
+                  📋 Copy Base64
+                </button>
+              </div>
+              <div class="tab-pane fade" id="datauriContent" role="tabpanel">
+                <div class="base64-output" id="datauriOutput"></div>
+                <button class="btn copy-btn mt-3" onclick="copyToClipboard('datauri')">
+                  📋 Copy Data URI
+                </button>
+              </div>
+              <div class="tab-pane fade" id="jsonContent" role="tabpanel">
+                <div class="base64-output" id="jsonOutput"></div>
+                <button class="btn copy-btn mt-3" onclick="copyToClipboard('json')">
+                  📋 Copy JSON
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <footer class="gc-footer">
+    <div>${AGENCY_BRANDING.footerText}</div>
+  </footer>
+  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    let selectedFile = null;
+    let conversionResult = null;
+    
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const convertBtn = document.getElementById('convertBtn');
+    const resultSection = document.getElementById('resultSection');
+    
+    function showToast(message, type) {
+      type = type || 'success';
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = 'toast-notification ' + type;
+      toast.style.display = 'block';
+      setTimeout(function() {
+        toast.style.display = 'none';
+      }, 3000);
+    }
+    
+    function formatFileSize(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    
+    function getFileTypeDisplay(filename) {
+      const ext = filename.split('.').pop().toUpperCase();
+      const types = {
+        'PDF': 'PDF Document',
+        'DOCX': 'Word Document',
+        'XLSX': 'Excel Spreadsheet',
+        'PPTX': 'PowerPoint Presentation'
+      };
+      return types[ext] || ext;
+    }
+    
+    function validateFile(file) {
+      const allowedExtensions = ['.pdf', '.docx', '.xlsx', '.pptx'];
+      const maxSize = 50 * 1024 * 1024;
+      
+      const ext = '.' + file.name.split('.').pop().toLowerCase();
+      
+      if (allowedExtensions.indexOf(ext) === -1) {
+        showToast('Invalid file type. Allowed: PDF, DOCX, XLSX, PPTX', 'error');
+        return false;
+      }
+      
+      if (file.size > maxSize) {
+        showToast('File too large. Maximum size is 50MB', 'error');
+        return false;
+      }
+      
+      return true;
+    }
+    
+    function handleFileSelect(file) {
+      if (!validateFile(file)) return;
+      
+      selectedFile = file;
+      
+      document.getElementById('fileName').textContent = file.name;
+      document.getElementById('fileSize').textContent = formatFileSize(file.size);
+      document.getElementById('fileType').textContent = getFileTypeDisplay(file.name);
+      
+      fileInfo.classList.add('show');
+      uploadZone.classList.add('has-file');
+      convertBtn.disabled = false;
+      resultSection.classList.remove('show');
+    }
+    
+    uploadZone.addEventListener('click', function() {
+      fileInput.click();
+    });
+    
+    fileInput.addEventListener('change', function(e) {
+      if (e.target.files.length > 0) {
+        handleFileSelect(e.target.files[0]);
+      }
+    });
+    
+    uploadZone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      uploadZone.classList.add('dragover');
+    });
+    
+    uploadZone.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      uploadZone.classList.remove('dragover');
+    });
+    
+    uploadZone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      uploadZone.classList.remove('dragover');
+      
+      if (e.dataTransfer.files.length > 0) {
+        handleFileSelect(e.dataTransfer.files[0]);
+      }
+    });
+    
+    document.getElementById('clearFile').addEventListener('click', function(e) {
+      e.stopPropagation();
+      selectedFile = null;
+      conversionResult = null;
+      fileInput.value = '';
+      fileInfo.classList.remove('show');
+      uploadZone.classList.remove('has-file');
+      convertBtn.disabled = true;
+      resultSection.classList.remove('show');
+    });
+    
+    convertBtn.addEventListener('click', function() {
+      if (!selectedFile) return;
+      
+      const spinner = convertBtn.querySelector('.loading-spinner');
+      spinner.classList.add('show');
+      convertBtn.disabled = true;
+      
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      
+      fetch('/api/public/file-to-base64', {
+        method: 'POST',
+        body: formData
+      })
+      .then(function(response) {
+        if (!response.ok) {
+          return response.json().then(function(errorData) {
+            throw new Error(errorData.message || 'Conversion failed');
+          });
+        }
+        return response.json();
+      })
+      .then(function(data) {
+        conversionResult = data;
+        
+        document.getElementById('base64Output').textContent = conversionResult.base64;
+        document.getElementById('datauriOutput').textContent = conversionResult.dataUri;
+        document.getElementById('jsonOutput').textContent = JSON.stringify(conversionResult, null, 2);
+        
+        document.getElementById('resultSize').textContent = 'Original: ' + conversionResult.sizeFormatted;
+        document.getElementById('resultLength').textContent = 'Base64: ' + formatFileSize(conversionResult.base64.length);
+        
+        resultSection.classList.add('show');
+        resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        showToast('File converted successfully!', 'success');
+      })
+      .catch(function(error) {
+        console.error('Conversion error:', error);
+        showToast(error.message || 'Conversion failed', 'error');
+      })
+      .finally(function() {
+        spinner.classList.remove('show');
+        convertBtn.disabled = false;
+      });
+    });
+    
+    function copyToClipboard(type) {
+      if (!conversionResult) return;
+      
+      var textToCopy;
+      switch (type) {
+        case 'base64':
+          textToCopy = conversionResult.base64;
+          break;
+        case 'datauri':
+          textToCopy = conversionResult.dataUri;
+          break;
+        case 'json':
+          textToCopy = JSON.stringify(conversionResult, null, 2);
+          break;
+      }
+      
+      navigator.clipboard.writeText(textToCopy).then(function() {
+        showToast('Copied to clipboard!', 'success');
+      }).catch(function(error) {
+        console.error('Copy failed:', error);
+        showToast('Failed to copy', 'error');
+      });
+    }
+  </script>
+</body>
+</html>`;
+
+  res.send(html);
+});
+
+// Public API endpoint for file to base64 conversion (no auth required)
+app.post('/api/public/file-to-base64', upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        error: 'No file uploaded',
+        message: 'Please upload a file (PDF, DOCX, XLSX, or PPTX)'
+      });
+    }
+
+    const base64String = req.file.buffer.toString('base64');
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    
+    const mimeTypes = {
+      '.pdf': 'application/pdf',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    };
+
+    const mimeType = mimeTypes[ext] || req.file.mimetype;
+
+    console.log('File converted to base64: ' + req.file.originalname + ' (' + req.file.size + ' bytes)');
+
+    res.json({
+      success: true,
+      filename: req.file.originalname,
+      mimeType: mimeType,
+      size: req.file.size,
+      sizeFormatted: formatBytes(req.file.size),
+      base64: base64String,
+      dataUri: 'data:' + mimeType + ';base64,' + base64String
+    });
+
+  } catch (error) {
+    console.error('File conversion error:', error);
+    res.status(500).json({ 
+      error: 'File conversion failed',
+      message: error.message 
+    });
+  }
+});
+
+// Error handler for multer
+app.use((error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        error: 'File too large',
+        message: 'Maximum file size is 50MB'
+      });
+    }
+    return res.status(400).json({
+      error: 'Upload error',
+      message: error.message
+    });
+  }
+  
+  if (error.message && error.message.includes('Invalid file type')) {
+    return res.status(400).json({
+      error: 'Invalid file type',
+      message: error.message
+    });
+  }
+  
+  next(error);
+});
 
 // Start the server
 const port = process.env.PORT || 3000;
