@@ -1,4 +1,4 @@
-// server.js - With publisher dropdown feature and dual authentication
+// server.js - With publisher dropdown feature, dual authentication, and path filtering
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -46,6 +46,147 @@ const azureConfig = {
   scopes: [process.env.scopes],
   appScopes: [process.env.app_scopes || process.env.scopes]
 };
+
+// =============================================================================
+// PATH FILTER CONFIGURATION
+// =============================================================================
+// Set this to filter OpenAPI paths. Supports:
+// - Simple string: 'digitalsignature' (case-insensitive contains)
+// - Regex pattern: '(digitalsignature|document)' (multiple patterns)
+// - Empty string or null: No filtering (show all paths)
+const PATH_FILTER = process.env.PATH_FILTER || 'digitalsignature';
+
+/**
+ * Filter OpenAPI spec to include only paths matching a pattern
+ * @param {Object} openApiSpec - The full OpenAPI specification object
+ * @param {string|RegExp} pattern - Pattern to match (string for case-insensitive contains, or RegExp)
+ * @param {Object} options - Additional options
+ * @returns {Object} Filtered OpenAPI specification
+ */
+function filterOpenApiByPattern(openApiSpec, pattern, options = {}) {
+  const { caseInsensitive = true, cleanupSchemas = true } = options;
+  
+  if (!pattern || !openApiSpec || !openApiSpec.paths) {
+    console.log('No path filter applied (empty pattern or no paths)');
+    return openApiSpec;
+  }
+
+  // Create a deep copy to avoid mutating the original
+  const filteredSpec = JSON.parse(JSON.stringify(openApiSpec));
+  
+  // Build the regex pattern
+  let regex;
+  if (pattern instanceof RegExp) {
+    regex = pattern;
+  } else {
+    // Escape special regex characters and create pattern
+    const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    regex = new RegExp(escapedPattern, caseInsensitive ? 'i' : '');
+  }
+
+  // Count for logging
+  const originalPathCount = Object.keys(filteredSpec.paths).length;
+  const matchedPaths = [];
+  const filteredOutPaths = [];
+
+  // Filter paths
+  const newPaths = {};
+  for (const [pathKey, pathItem] of Object.entries(filteredSpec.paths)) {
+    if (regex.test(pathKey)) {
+      newPaths[pathKey] = pathItem;
+      matchedPaths.push(pathKey);
+    } else {
+      filteredOutPaths.push(pathKey);
+    }
+  }
+
+  filteredSpec.paths = newPaths;
+
+  // Log filtering results
+  console.log('\n' + '='.repeat(80));
+  console.log(`PATH FILTER APPLIED: "${pattern}"`);
+  console.log('='.repeat(80));
+  console.log(`Original paths: ${originalPathCount}`);
+  console.log(`Matched paths: ${matchedPaths.length}`);
+  console.log(`Filtered out: ${filteredOutPaths.length}`);
+  
+  if (matchedPaths.length > 0 && matchedPaths.length <= 50) {
+    console.log('\nMatched paths:');
+    matchedPaths.forEach(p => console.log(`  ✓ ${p}`));
+  } else if (matchedPaths.length > 50) {
+    console.log(`\nFirst 20 matched paths:`);
+    matchedPaths.slice(0, 20).forEach(p => console.log(`  ✓ ${p}`));
+    console.log(`  ... and ${matchedPaths.length - 20} more`);
+  } else if (matchedPaths.length === 0) {
+    console.log('\n⚠️  WARNING: No paths matched the filter!');
+    console.log('First 10 available paths:');
+    filteredOutPaths.slice(0, 10).forEach(p => console.log(`  - ${p}`));
+  }
+  console.log('='.repeat(80) + '\n');
+
+  // Optionally clean up unused schemas/components
+  if (cleanupSchemas && filteredSpec.components?.schemas) {
+    const usedSchemas = findUsedSchemas(filteredSpec);
+    const originalSchemaCount = Object.keys(filteredSpec.components.schemas).length;
+    
+    for (const schemaName of Object.keys(filteredSpec.components.schemas)) {
+      if (!usedSchemas.has(schemaName)) {
+        delete filteredSpec.components.schemas[schemaName];
+      }
+    }
+    
+    const remainingSchemaCount = Object.keys(filteredSpec.components.schemas).length;
+    console.log(`Schemas cleaned: ${originalSchemaCount} → ${remainingSchemaCount} (removed ${originalSchemaCount - remainingSchemaCount} unused)`);
+  }
+
+  // Update the description to indicate filtering
+  if (filteredSpec.info) {
+    filteredSpec.info.description = (filteredSpec.info.description || '') + 
+      `\n\n**Path Filter Applied:** \`${pattern}\` (${matchedPaths.length} paths)`;
+  }
+
+  return filteredSpec;
+}
+
+/**
+ * Find all schemas referenced in the OpenAPI spec
+ * @param {Object} spec - OpenAPI specification
+ * @returns {Set<string>} Set of schema names that are used
+ */
+function findUsedSchemas(spec) {
+  const usedSchemas = new Set();
+  const schemaRefPattern = /#\/components\/schemas\/([^"'}\s]+)/g;
+  
+  // Convert spec to string and find all $ref occurrences
+  const specString = JSON.stringify(spec);
+  let match;
+  while ((match = schemaRefPattern.exec(specString)) !== null) {
+    usedSchemas.add(match[1]);
+  }
+  
+  // Recursively find schemas referenced by other schemas
+  let prevSize = 0;
+  while (usedSchemas.size > prevSize) {
+    prevSize = usedSchemas.size;
+    for (const schemaName of [...usedSchemas]) {
+      const schema = spec.components?.schemas?.[schemaName];
+      if (schema) {
+        const schemaString = JSON.stringify(schema);
+        let innerMatch;
+        const innerPattern = /#\/components\/schemas\/([^"'}\s]+)/g;
+        while ((innerMatch = innerPattern.exec(schemaString)) !== null) {
+          usedSchemas.add(innerMatch[1]);
+        }
+      }
+    }
+  }
+  
+  return usedSchemas;
+}
+
+// =============================================================================
+// END PATH FILTER CONFIGURATION
+// =============================================================================
 
 // Initialize MSAL
 let msalConfig = {
@@ -178,6 +319,15 @@ app.get('/', (req, res) => {
             top: 50%;
             transform: translateY(-50%);
           }
+          .filter-badge {
+            background-color: #17a2b8;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            margin-top: 0.5rem;
+            display: inline-block;
+          }
         </style>
       </head>
       <body class="text-center">
@@ -185,7 +335,9 @@ app.get('/', (req, res) => {
           <h1 class="h3 mb-3 fw-normal">Dataverse API Explorer</h1>
           <p class="mb-3 text-muted">Access documentation for your Dataverse environment APIs</p>
           
-          <div class="card p-3 bg-light">
+          ${PATH_FILTER ? `<div class="filter-badge">🔍 Path Filter: "${PATH_FILTER}"</div>` : ''}
+          
+          <div class="card p-3 bg-light mt-3">
             <form method="POST" action="/set-tenant" class="text-start mb-3">
               <div class="form-floating mb-3">
                 <input type="text" class="form-control" id="tenantId" name="tenantId" 
@@ -263,6 +415,19 @@ app.get('/', (req, res) => {
             text-align: center;
             margin-bottom: 1rem;
           }
+          .filter-info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 0.25rem;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+          }
+          .filter-info code {
+            background-color: #fff;
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.125rem;
+          }
         </style>
       </head>
       <body>
@@ -272,6 +437,12 @@ app.get('/', (req, res) => {
           </div>
           
           <h1 class="h3 mb-3 fw-normal text-center">Generate API Documentation</h1>
+          
+          ${PATH_FILTER ? `
+          <div class="filter-info">
+            <strong>🔍 Path Filter Active:</strong> Only paths containing <code>${PATH_FILTER}</code> will be shown in the generated documentation.
+          </div>
+          ` : ''}
           
           <div id="statusMessages"></div>
           
@@ -685,6 +856,7 @@ app.get('/api/whoami', async (req, res) => {
     
     res.json({
       sessionAuthType: req.session.authType,
+      pathFilter: PATH_FILTER || 'None',
       tokenClaims: {
         appid: payload.appid,
         oid: payload.oid,
@@ -887,6 +1059,7 @@ app.post('/generate-docs', async (req, res) => {
           <h1 class="h3 mb-3 fw-normal">Generating API Documentation</h1>
           <p class="text-muted">Fetching metadata from Dataverse and processing...</p>
           ${prefix ? `<p class="badge bg-info">Filtering by prefix: ${prefix}</p>` : ''}
+          ${PATH_FILTER ? `<p class="badge bg-secondary">Path filter: ${PATH_FILTER}</p>` : ''}
           <div class="progress mt-4">
             <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
           </div>
@@ -958,6 +1131,7 @@ app.post('/api/generate-openapi', async (req, res) => {
   try {
     console.log(`Generating OpenAPI spec for ${envUrl} with prefix ${prefix || 'None'}`);
     console.log(`Using auth type: ${req.session.authType || 'user'}`);
+    console.log(`Path filter: ${PATH_FILTER || 'None'}`);
     
     if (!envUrl) {
       throw new Error('Dataverse URL is required');
@@ -967,7 +1141,19 @@ app.post('/api/generate-openapi', async (req, res) => {
     console.log(`Using normalized URL: ${apiUrl}`);
     
     try {
-      openApiSpec = await generateSimpleOpenApiSpec(apiUrl, req.session.token, prefix);
+      // Generate the raw OpenAPI spec
+      let rawSpec = await generateSimpleOpenApiSpec(apiUrl, req.session.token, prefix);
+      
+      // Apply path filter if configured
+      if (PATH_FILTER) {
+        console.log(`\nApplying path filter: "${PATH_FILTER}"`);
+        openApiSpec = filterOpenApiByPattern(rawSpec, PATH_FILTER, {
+          caseInsensitive: true,
+          cleanupSchemas: true
+        });
+      } else {
+        openApiSpec = rawSpec;
+      }
       
       req.session.openApiGenerated = true;
       req.session.prefix = prefix;
@@ -980,7 +1166,12 @@ app.post('/api/generate-openapi', async (req, res) => {
         console.warn('Warning: Could not save spec file for debugging:', fileError.message);
       }
       
-      res.status(200).json({ success: true });
+      res.status(200).json({ 
+        success: true,
+        totalPaths: Object.keys(rawSpec.paths || {}).length,
+        filteredPaths: Object.keys(openApiSpec.paths || {}).length,
+        pathFilter: PATH_FILTER || null
+      });
     } catch (specError) {
       console.error('Error generating OpenAPI spec:', specError);
       
@@ -1135,6 +1326,8 @@ app.get('/api-docs', (req, res) => {
   const authBadge = authType === 'application' 
     ? '<span class="badge bg-success">Application Identity</span>' 
     : '<span class="badge bg-primary">User Identity</span>';
+  
+  const pathCount = Object.keys(openApiSpec.paths || {}).length;
     
   const swaggerHtml = `
     <!DOCTYPE html>
@@ -1171,6 +1364,13 @@ app.get('/api-docs', (req, res) => {
           padding: 0.75rem;
           margin-top: 0;
           border-bottom: 1px solid #ccc;
+          font-size: 0.9rem;
+        }
+        .path-filter {
+          background-color: #d4edda;
+          padding: 0.75rem;
+          margin-top: 0;
+          border-bottom: 1px solid #c3e6cb;
           font-size: 0.9rem;
         }
         .token-helper {
@@ -1242,7 +1442,13 @@ app.get('/api-docs', (req, res) => {
 
       ${prefix ? `
       <div class="prefix-filter">
-        <strong>Entity prefix filter applied:</strong> ${prefix}
+        <strong>📦 Entity prefix filter:</strong> ${prefix}
+      </div>
+      ` : ''}
+      
+      ${PATH_FILTER ? `
+      <div class="path-filter">
+        <strong>🔍 Path filter:</strong> <code>${PATH_FILTER}</code> — Showing ${pathCount} matching paths
       </div>
       ` : ''}
 
@@ -1726,15 +1932,16 @@ function attributeTypeToOpenApiType(attributeType) {
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`
-╔════════════════════════════════════════════╗
-║  Dataverse API Explorer                    ║
-║  Server running on http://localhost:${port}     ║
-║                                            ║
-║  Environment information:                  ║
-║  - Dataverse URL: ${process.env.dataverse_url ? 'Configured ✓' : 'Not set ✗'}           ║
-║  - Client Secret: ${process.env.client_secret ? 'Configured ✓' : 'Not set ✗'}           ║
-║  - Session Secret: ${process.env.session_secret ? 'Configured ✓' : 'Not set ✗'}         ║
-║  - Tenant ID: ${process.env.tenant_id || 'Default'}    ║
-╚════════════════════════════════════════════╝
+╔════════════════════════════════════════════════════════════╗
+║  Dataverse API Explorer                                    ║
+║  Server running on http://localhost:${port}                     ║
+║                                                            ║
+║  Environment information:                                  ║
+║  - Dataverse URL: ${process.env.dataverse_url ? 'Configured ✓' : 'Not set ✗'}                       ║
+║  - Client Secret: ${process.env.client_secret ? 'Configured ✓' : 'Not set ✗'}                       ║
+║  - Session Secret: ${process.env.session_secret ? 'Configured ✓' : 'Not set ✗'}                     ║
+║  - Tenant ID: ${process.env.tenant_id || 'Default'}                            ║
+║  - Path Filter: ${PATH_FILTER || 'None (showing all paths)'}                   ║
+╚════════════════════════════════════════════════════════════╝
 `);
 });
