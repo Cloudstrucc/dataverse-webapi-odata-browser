@@ -1730,7 +1730,7 @@ app.listen(port, () => {
 ║  Dataverse API Explorer                    ║
 ║  Server running on http://localhost:${port}     ║
 ║                                            ║
-║  Environment:                              ║
+║  Environment information:                  ║
 ║  - Dataverse URL: ${process.env.dataverse_url ? 'Configured ✓' : 'Not set ✗'}           ║
 ║  - Client Secret: ${process.env.client_secret ? 'Configured ✓' : 'Not set ✗'}           ║
 ║  - Session Secret: ${process.env.session_secret ? 'Configured ✓' : 'Not set ✗'}         ║
