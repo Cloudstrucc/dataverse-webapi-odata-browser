@@ -1,30 +1,53 @@
 #!/bin/bash
 
-# Set Azure resource variables
-RESOURCE_GROUP="rg-dataverse-api-explorer"
-APP_NAME="dataverse-api-explorer"
+# =============================================================================
+# Azure App Service - Configure/Update App Settings
+# Idempotent: Always updates settings (upsert operation)
+# =============================================================================
 
-# Path to your .env file
-ENV_FILE=".env"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/.env"
 
-# Check if .env file exists
 if [ ! -f "$ENV_FILE" ]; then
-  echo "Error: $ENV_FILE not found!"
+  echo "❌ Error: .env file not found at $ENV_FILE"
   exit 1
 fi
 
-# Load variables from .env file
+echo "📂 Loading configuration from: $ENV_FILE"
 export $(grep -v '^#' "$ENV_FILE" | grep -v '^$' | xargs)
 
-# Override redirectUri for Azure (not localhost)
-REDIRECT_URI="https://${APP_NAME}.azurewebsites.net/auth/callback"
-
-# Generate a secure session secret if not set or is default
-if [ "$session_secret" = "RANDOM_SESSION_SECRET" ] || [ -z "$session_secret" ]; then
-  session_secret=$(openssl rand -base64 32)
+if [ -z "$APP_NAME" ] || [ -z "$RESOURCE_GROUP" ]; then
+  echo "❌ Error: APP_NAME and RESOURCE_GROUP must be set in .env"
+  exit 1
 fi
 
-# Set all app settings
+# Check Web App exists
+if ! az webapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
+  echo "❌ Error: Web App '$APP_NAME' not found. Run ./1-create-resources.sh first"
+  exit 1
+fi
+
+# Set Azure redirect URI
+redirectUri="https://${APP_NAME}.azurewebsites.net/auth/callback"
+
+# Handle session secret - keep existing or generate new
+if [ "$session_secret" = "RANDOM_SESSION_SECRET" ] || [ -z "$session_secret" ]; then
+  EXISTING_SECRET=$(az webapp config appsettings list --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query "[?name=='session_secret'].value" -o tsv 2>/dev/null)
+  if [ -n "$EXISTING_SECRET" ]; then
+    session_secret="$EXISTING_SECRET"
+    echo "🔐 Using existing session secret"
+  else
+    session_secret=$(openssl rand -base64 32)
+    echo "🔐 Generated new session secret"
+  fi
+fi
+
+echo ""
+echo "⚙️  Updating App Settings..."
+echo "   App: $APP_NAME"
+echo "   Redirect URI: $redirectUri"
+echo ""
+
 az webapp config appsettings set \
   --name "$APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
@@ -36,15 +59,22 @@ az webapp config appsettings set \
     dataverse_url="$dataverse_url" \
     scopes="$scopes" \
     app_scopes="$app_scopes" \
-    redirectUri="$REDIRECT_URI" \
+    redirectUri="$redirectUri" \
     PATH_FILTER="$PATH_FILTER" \
     AGENCY_NAME="$AGENCY_NAME" \
     AGENCY_URL="$AGENCY_URL" \
     AGENCY_HEADER_BG="$AGENCY_HEADER_BG" \
-    AGENCY_ACCENT_COLOR="$AGENCY_ACCENT_COLOR"
+    AGENCY_ACCENT_COLOR="$AGENCY_ACCENT_COLOR" \
+  --output none
 
-echo ""
-echo "✅ App settings configured successfully!"
-echo ""
-echo "⚠️  Don't forget to add this redirect URI to your Azure AD app registration:"
-echo "   $REDIRECT_URI"
+if [ $? -eq 0 ]; then
+  echo "✅ App settings updated!"
+  echo ""
+  echo "⚠️  Add this redirect URI to Azure AD app registration:"
+  echo "   $redirectUri"
+  echo ""
+  echo "📌 Next: ./3-deploy-app.sh"
+else
+  echo "❌ Failed to update app settings"
+  exit 1
+fi
