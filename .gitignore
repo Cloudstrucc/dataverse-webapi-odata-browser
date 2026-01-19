@@ -50,5 +50,4 @@ openapi-spec.json
 metadata.xml
 
 *.env
-deploy-scripts
 
