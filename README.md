@@ -17,7 +17,7 @@ A powerful tool to explore and document Microsoft Dataverse APIs with customizab
   - **User Identity**: Sign in with your Microsoft account and security roles
   - **Application Identity**: Use app registration for service-to-service authentication
 * 🛡️ **Permission-Based Filtering**: Only shows entities the authenticated identity can access
-* 🎨 **Customizable Branding**:  Easy agency/organization theming via environment variables
+* 🎨 **Customizable Branding**: Easy agency/organization theming via environment variables
 * 🔄 **Customizable Tenant**: Set different Azure AD tenants for different environments
 * 📱 **Responsive Design**: Works on desktop and mobile devices
 
@@ -276,13 +276,19 @@ PATH_FILTER=
 
 ```
 dataverse-webapi-odata-browser/
-├── server.js           # Main application file
-├── .env.example        # Example environment configuration
-├── .env                # Your environment configuration (not in git)
-├── package.json        # Node.js dependencies
-├── public/             # Static files (logos, etc.)
-├── temp/               # Temporary files (generated specs)
-└── README.md           # This file
+├── server.js                 # Main application file
+├── package.json              # Node.js dependencies
+├── .env.example              # Example environment configuration
+├── .env                      # Your environment configuration (not in git)
+├── README.md                 # This file
+├── public/                   # Static files (logos, etc.)
+├── temp/                     # Temporary files (generated specs)
+└── deploy-scripts/           # Azure deployment scripts
+    ├── .env                  # Deployment configuration (create this)
+    ├── 1-create-resources.sh # Create Azure resources
+    ├── 2-configure-app-settings.sh # Configure app settings
+    ├── 3-deploy-app.sh       # Deploy application code
+    └── 4-https-only.sh       # Enable HTTPS and final config
 ```
 
 ## 🚀 Deployment
@@ -294,96 +300,114 @@ Azure App Service is the recommended deployment option as it supports the full N
 #### Requirements
 - [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) installed
 - Azure subscription
+- Logged into Azure CLI (`az login`)
 
 #### Step-by-Step Deployment
 
-**1. Create Azure Resources**
+The `deploy-scripts` folder contains automated deployment scripts that read from a single `.env` configuration file.
+
+**1. Create the .env file in the deploy-scripts folder**
 
 ```bash
-# Login to Azure
-az login
-
-# Set variables
-RESOURCE_GROUP="rg-dataverse-api-explorer"
-APP_NAME="dataverse-api-explorer"  # Must be globally unique
-LOCATION="canadacentral"  # Use your preferred region
-
-# Create resource group
-az group create --name $RESOURCE_GROUP --location $LOCATION
-
-# Create App Service Plan (B1 is minimum for always-on)
-az appservice plan create \
-  --name "${APP_NAME}-plan" \
-  --resource-group $RESOURCE_GROUP \
-  --sku B1 \
-  --is-linux
-
-# Create Web App
-az webapp create \
-  --name $APP_NAME \
-  --resource-group $RESOURCE_GROUP \
-  --plan "${APP_NAME}-plan" \
-  --runtime "NODE:18-lts"
+cd deploy-scripts
 ```
 
-**2. Configure Application Settings**
+Create a `.env` file with your configuration:
+
+```env
+# Azure Resource Configuration
+RESOURCE_GROUP=rg-dataverse-api-explorer
+APP_NAME=dataverse-api-explorer
+LOCATION=canadacentral
+
+# Azure AD Configuration
+client_id=YOUR_CLIENT_ID
+tenant_id=YOUR_TENANT_ID
+client_secret=YOUR_CLIENT_SECRET
+
+# Application Configuration
+session_secret=RANDOM_SESSION_SECRET
+
+# Dataverse Configuration
+dataverse_url=https://your-org.crm.dynamics.com/
+
+# OAuth Configuration
+scopes=https://your-org.crm.dynamics.com/.default
+app_scopes=https://your-org.crm.dynamics.com/.default
+
+# Path Filter (optional)
+PATH_FILTER=digitalsignature
+
+# Agency Branding
+AGENCY_NAME=Your Organization Name
+AGENCY_URL=https://www.your-org.com
+AGENCY_HEADER_BG=#26374a
+AGENCY_ACCENT_COLOR=#af3c43
+```
+
+> **Note:** The `APP_NAME` must be globally unique across Azure. If deployment fails, try a more unique name like `dataverse-api-explorer-yourcompany`.
+
+**2. Make the scripts executable**
 
 ```bash
-# Set environment variables
-az webapp config appsettings set \
-  --name $APP_NAME \
-  --resource-group $RESOURCE_GROUP \
-  --settings \
-    client_id="YOUR_CLIENT_ID" \
-    tenant_id="YOUR_TENANT_ID" \
-    client_secret="YOUR_CLIENT_SECRET" \
-    session_secret="$(openssl rand -base64 32)" \
-    dataverse_url="https://your-org.crm.dynamics.com/" \
-    scopes="https://your-org.crm.dynamics.com/.default" \
-    app_scopes="https://your-org.crm.dynamics.com/.default" \
-    redirectUri="https://${APP_NAME}.azurewebsites.net/auth/callback" \
-    PATH_FILTER="digitalsignature" \
-    AGENCY_NAME="Your Agency Name" \
-    AGENCY_URL="https://www.your-agency.ca" \
-    AGENCY_HEADER_BG="#26374a" \
-    AGENCY_ACCENT_COLOR="#af3c43"
+chmod +x 1-create-resources.sh
+chmod +x 2-configure-app-settings.sh
+chmod +x 3-deploy-app.sh
+chmod +x 4-https-only.sh
 ```
 
-**3. Update Azure AD App Registration**
+**3. Run the deployment scripts in sequence**
+
+```bash
+# Step 1: Create Azure resources (Resource Group, App Service Plan, Web App)
+./1-create-resources.sh
+
+# Step 2: Configure all application settings from .env
+./2-configure-app-settings.sh
+
+# Step 3: Deploy the application code (choose ZIP or GitHub deploy)
+./3-deploy-app.sh
+
+# Step 4: Enable HTTPS and final configuration
+./4-https-only.sh
+```
+
+**4. Update Azure AD App Registration**
 
 Add the new redirect URI to your Azure AD app registration:
-- Go to Azure Portal → Azure AD → App registrations → Your app
-- Add redirect URI: `https://<APP_NAME>.azurewebsites.net/auth/callback`
-
-**4. Deploy the Application**
-
-```bash
-# Option A: Deploy from local folder using ZIP deploy
-zip -r deploy.zip . -x "node_modules/*" -x ".git/*" -x ".env"
-az webapp deployment source config-zip \
-  --name $APP_NAME \
-  --resource-group $RESOURCE_GROUP \
-  --src deploy.zip
-
-# Option B: Deploy from GitHub
-az webapp deployment source config \
-  --name $APP_NAME \
-  --resource-group $RESOURCE_GROUP \
-  --repo-url "https://github.com/YOUR_USERNAME/dataverse-webapi-odata-browser" \
-  --branch main \
-  --manual-integration
-```
-
-**5. Enable HTTPS Only**
-
-```bash
-az webapp update \
-  --name $APP_NAME \
-  --resource-group $RESOURCE_GROUP \
-  --https-only true
-```
+1. Go to Azure Portal → Azure AD → App registrations → Your app
+2. Go to **Authentication** → **Add a platform** (or edit existing Web platform)
+3. Add redirect URI: `https://<APP_NAME>.azurewebsites.net/auth/callback`
+4. Click **Save**
 
 Your app will be available at: `https://<APP_NAME>.azurewebsites.net`
+
+#### Deployment Scripts Reference
+
+| Script | Purpose |
+|--------|---------|
+| `1-create-resources.sh` | Creates Resource Group, App Service Plan, and Web App (or updates if they exist) |
+| `2-configure-app-settings.sh` | Sets all environment variables from .env (idempotent - safe to re-run) |
+| `3-deploy-app.sh` | Deploys code via ZIP upload or GitHub integration |
+| `4-https-only.sh` | Enables HTTPS-only, Always On, and sets startup command |
+
+> **Tip:** All scripts are idempotent - you can safely re-run them to update your deployment. Just modify the `.env` file and re-run the relevant script.
+
+#### Useful Commands After Deployment
+
+```bash
+# View application logs
+az webapp log tail --name <APP_NAME> --resource-group <RESOURCE_GROUP>
+
+# Check app status
+az webapp show --name <APP_NAME> --resource-group <RESOURCE_GROUP> --query state
+
+# View current app settings
+az webapp config appsettings list --name <APP_NAME> --resource-group <RESOURCE_GROUP> --output table
+
+# Restart the app
+az webapp restart --name <APP_NAME> --resource-group <RESOURCE_GROUP>
+```
 
 ---
 
@@ -391,7 +415,7 @@ Your app will be available at: `https://<APP_NAME>.azurewebsites.net`
 
 If you only need to display pre-generated Swagger documentation (no dynamic generation), you can use Azure Static Web Apps for a cost-effective, serverless solution.
 
-#### Prerequisites (web apps)
+#### Prerequisites
 - Pre-generated `swagger.json` file
 - GitHub repository
 
