@@ -56,6 +56,15 @@ const azureConfig = {
 // - Empty string or null: No filtering (show all paths)
 const PATH_FILTER = process.env.PATH_FILTER || 'digitalsignature';
 
+// =============================================================================
+// AGENCY BRANDING CONFIGURATION
+// =============================================================================
+// Customize these values via environment variables or directly here
+const AGENCY_NAME = process.env.AGENCY_NAME || 'Elections Canada';
+const AGENCY_URL = process.env.AGENCY_URL || 'https://www.elections.ca';
+const AGENCY_HEADER_BG = process.env.AGENCY_HEADER_BG || '#26374a';
+const AGENCY_ACCENT_COLOR = process.env.AGENCY_ACCENT_COLOR || '#af3c43';
+
 /**
  * Filter OpenAPI spec to include only paths matching a pattern
  * @param {Object} openApiSpec - The full OpenAPI specification object
@@ -258,35 +267,21 @@ function checkAuthentication(req, res, next) {
 // Add this middleware to your Express app
 app.use(checkAuthentication);
 
-// Elections Canada Branding Configuration
-const EC_BRANDING = {
-  headerBgColor: '#26374a',
+// Agency Branding Configuration (uses environment variables)
+const AGENCY_BRANDING = {
+  name: AGENCY_NAME,
+  url: AGENCY_URL,
+  headerBgColor: AGENCY_HEADER_BG,
+  accentColor: AGENCY_ACCENT_COLOR,
   headerHeight: '80px',
-  accentColor: '#af3c43',  // Elections Canada red
-  logoAlt: 'Elections Canada',
-  // SVG logo inline for Elections Canada (maple leaf with X)
-  logoSvg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50" height="40">
-    <style>.ec-text{fill:#fff;font-family:Arial,sans-serif;font-size:14px;font-weight:bold}</style>
-    <!-- Maple Leaf Outline -->
-    <path fill="#fff" d="M15,45 L18,35 L12,32 L18,30 L15,25 L20,27 L22,20 L25,27 L30,22 L28,28 L35,30 L28,32 L32,35 L25,35 L25,45 Z"/>
-    <!-- X Mark -->
-    <g transform="translate(30,15)">
-      <rect x="0" y="8" width="20" height="4" fill="#fff" transform="rotate(-45 10 10)"/>
-      <rect x="0" y="8" width="20" height="4" fill="#fff" transform="rotate(45 10 10)"/>
-    </g>
-    <!-- Text -->
-    <text x="55" y="32" class="ec-text">Elections Canada</text>
-  </svg>`,
-  footerText: '© Elections Canada'
+  footerText: `© ${AGENCY_NAME}`
 };
 
-// Common CSS for Elections Canada branding
-const EC_COMMON_STYLES = `
+// Common CSS for Agency branding
+const AGENCY_COMMON_STYLES = `
   :root {
-    --ec-header-bg: ${EC_BRANDING.headerBgColor};
-    --ec-accent: ${EC_BRANDING.accentColor};
-    --gc-blue: #26374a;
-    --gc-red: #af3c43;
+    --agency-header-bg: ${AGENCY_BRANDING.headerBgColor};
+    --agency-accent: ${AGENCY_BRANDING.accentColor};
   }
   
   * {
@@ -301,9 +296,9 @@ const EC_COMMON_STYLES = `
   }
   
   .gc-header {
-    background-color: var(--ec-header-bg);
+    background-color: var(--agency-header-bg);
     padding: 0 20px;
-    height: ${EC_BRANDING.headerHeight};
+    height: ${AGENCY_BRANDING.headerHeight};
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -316,13 +311,15 @@ const EC_COMMON_STYLES = `
     gap: 15px;
   }
   
-  .gc-header-logo svg {
-    height: 40px;
+  .gc-header-logo-name {
+    color: white;
+    font-size: 1.25rem;
+    font-weight: 700;
   }
   
   .gc-header-logo-text {
     color: white;
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     font-weight: 600;
     border-left: 2px solid rgba(255,255,255,0.3);
     padding-left: 15px;
@@ -350,11 +347,11 @@ const EC_COMMON_STYLES = `
   
   .gc-red-bar {
     height: 4px;
-    background-color: var(--gc-red);
+    background-color: var(--agency-accent);
   }
   
   .gc-footer {
-    background-color: var(--ec-header-bg);
+    background-color: var(--agency-header-bg);
     color: white;
     padding: 20px;
     text-align: center;
@@ -367,13 +364,8 @@ const EC_COMMON_STYLES = `
     text-decoration: underline;
   }
   
-  .ec-logo-img {
-    height: 45px;
-    width: auto;
-  }
-  
-  .badge-ec {
-    background-color: var(--gc-red);
+  .badge-agency {
+    background-color: var(--agency-accent);
     color: white;
   }
 `;
@@ -381,18 +373,18 @@ const EC_COMMON_STYLES = `
 // Home route - Login or Dashboard
 app.get('/', (req, res) => {
   if (!req.session.token) {
-    // Login page with Elections Canada branding
+    // Login page with Agency branding
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>API Explorer - Elections Canada</title>
+        <title>API Explorer - ${AGENCY_NAME}</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
-          ${EC_COMMON_STYLES}
+          ${AGENCY_COMMON_STYLES}
           
           html, body {
             height: 100%;
@@ -453,32 +445,31 @@ app.get('/', (req, res) => {
             transform: translateY(-50%);
           }
           
-          .btn-ec-primary {
-            background-color: var(--gc-blue);
-            border-color: var(--gc-blue);
+          .btn-agency-primary {
+            background-color: var(--agency-header-bg);
+            border-color: var(--agency-header-bg);
             color: white;
           }
           
-          .btn-ec-primary:hover {
+          .btn-agency-primary:hover {
             background-color: #1c2a38;
             border-color: #1c2a38;
             color: white;
           }
           
-          .btn-ec-secondary {
-            background-color: var(--gc-red);
-            border-color: var(--gc-red);
+          .btn-agency-secondary {
+            background-color: var(--agency-accent);
+            border-color: var(--agency-accent);
             color: white;
           }
           
-          .btn-ec-secondary:hover {
-            background-color: #8f3238;
-            border-color: #8f3238;
+          .btn-agency-secondary:hover {
+            opacity: 0.9;
             color: white;
           }
           
           .filter-badge {
-            background-color: var(--gc-red);
+            background-color: var(--agency-accent);
             color: white;
             padding: 0.25rem 0.75rem;
             border-radius: 0.25rem;
@@ -493,7 +484,7 @@ app.get('/', (req, res) => {
           }
           
           .page-title {
-            color: var(--gc-blue);
+            color: var(--agency-header-bg);
             font-weight: 600;
           }
         </style>
@@ -502,11 +493,11 @@ app.get('/', (req, res) => {
         <div class="page-wrapper">
           <header class="gc-header">
             <div class="gc-header-logo">
-              <span style="color: white; font-size: 1.25rem; font-weight: 600;">Elections Canada</span>
+              <span class="gc-header-logo-name">${AGENCY_NAME}</span>
               <span class="gc-header-logo-text">API Explorer</span>
             </div>
             <nav class="gc-header-nav">
-              <a href="https://www.elections.ca" target="_blank">Elections.ca</a>
+              <a href="${AGENCY_URL}" target="_blank">${AGENCY_NAME}</a>
             </nav>
           </header>
           <div class="gc-red-bar"></div>
@@ -514,7 +505,7 @@ app.get('/', (req, res) => {
           <main class="main-content">
             <div class="form-signin text-center">
               <h1 class="h3 mb-3 page-title">Dataverse API Explorer</h1>
-              <p class="mb-3 text-muted">Access documentation for Elections Canada Dataverse APIs</p>
+              <p class="mb-3 text-muted">Access documentation for ${AGENCY_NAME} Dataverse APIs</p>
               
               ${PATH_FILTER ? `<div class="filter-badge">🔍 Path Filter: "${PATH_FILTER}"</div>` : ''}
               
@@ -534,7 +525,7 @@ app.get('/', (req, res) => {
                 </div>
                 
                 <div class="auth-option">
-                  <a href="/auth/login" class="w-100 btn btn-lg btn-ec-primary">
+                  <a href="/auth/login" class="w-100 btn btn-lg btn-agency-primary">
                     <span class="btn-icon">👤</span>
                     Sign in as User
                   </a>
@@ -542,7 +533,7 @@ app.get('/', (req, res) => {
                 </div>
                 
                 <div class="auth-option">
-                  <a href="/auth/app-login" class="w-100 btn btn-lg btn-ec-secondary">
+                  <a href="/auth/app-login" class="w-100 btn btn-lg btn-agency-secondary">
                     <span class="btn-icon">🔑</span>
                     Sign in as Application
                   </a>
@@ -553,7 +544,7 @@ app.get('/', (req, res) => {
           </main>
           
           <footer class="gc-footer">
-            <div>${EC_BRANDING.footerText}</div>
+            <div>${AGENCY_BRANDING.footerText}</div>
           </footer>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
@@ -564,21 +555,21 @@ app.get('/', (req, res) => {
     // Show auth type in dashboard
     const authType = req.session.authType || 'user';
     const authBadge = authType === 'application' 
-      ? '<span class="badge badge-ec">Application Identity</span>' 
+      ? '<span class="badge badge-agency">Application Identity</span>' 
       : '<span class="badge bg-primary">User Identity</span>';
     
-    // Dashboard page with Elections Canada branding
+    // Dashboard page with Agency branding
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>API Explorer - Elections Canada</title>
+        <title>API Explorer - ${AGENCY_NAME}</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
-          ${EC_COMMON_STYLES}
+          ${AGENCY_COMMON_STYLES}
           
           html, body {
             height: 100%;
@@ -630,7 +621,7 @@ app.get('/', (req, res) => {
             background-color: #fff;
             padding: 0.125rem 0.25rem;
             border-radius: 0.125rem;
-            color: var(--gc-red);
+            color: var(--agency-accent);
           }
           
           .card {
@@ -639,29 +630,29 @@ app.get('/', (req, res) => {
           }
           
           .card-title {
-            color: var(--gc-blue);
+            color: var(--agency-header-bg);
             font-weight: 600;
           }
           
-          .btn-ec-primary {
-            background-color: var(--gc-blue);
-            border-color: var(--gc-blue);
+          .btn-agency-primary {
+            background-color: var(--agency-header-bg);
+            border-color: var(--agency-header-bg);
             color: white;
           }
           
-          .btn-ec-primary:hover {
+          .btn-agency-primary:hover {
             background-color: #1c2a38;
             border-color: #1c2a38;
             color: white;
           }
           
           .page-title {
-            color: var(--gc-blue);
+            color: var(--agency-header-bg);
             font-weight: 600;
           }
           
-          .badge-ec {
-            background-color: var(--gc-red) !important;
+          .badge-agency {
+            background-color: var(--agency-accent) !important;
             color: white;
           }
         </style>
@@ -670,7 +661,7 @@ app.get('/', (req, res) => {
         <div class="page-wrapper">
           <header class="gc-header">
             <div class="gc-header-logo">
-              <span style="color: white; font-size: 1.25rem; font-weight: 600;">Elections Canada</span>
+              <span class="gc-header-logo-name">${AGENCY_NAME}</span>
               <span class="gc-header-logo-text">API Explorer</span>
             </div>
             <nav class="gc-header-nav">
@@ -724,7 +715,7 @@ app.get('/', (req, res) => {
                       </div>
                       <input type="hidden" id="prefix" name="prefix" value="">
                     </div>
-                    <button class="w-100 btn btn-lg btn-ec-primary" type="submit">Generate API Docs</button>
+                    <button class="w-100 btn btn-lg btn-agency-primary" type="submit">Generate API Docs</button>
                   </form>
                   
                   <!-- Debug Section -->
@@ -742,7 +733,7 @@ app.get('/', (req, res) => {
           </main>
           
           <footer class="gc-footer">
-            <div>${EC_BRANDING.footerText}</div>
+            <div>${AGENCY_BRANDING.footerText}</div>
           </footer>
         </div>
         
@@ -771,7 +762,6 @@ app.get('/', (req, res) => {
             const apiForm = document.getElementById('apiForm');
             const statusMessages = document.getElementById('statusMessages');
             
-            // Function to show status message
             function showStatusMessage(message, type = 'info') {
               const alertDiv = document.createElement('div');
               alertDiv.className = \`alert alert-\${type} alert-dismissible fade show\`;
@@ -780,28 +770,21 @@ app.get('/', (req, res) => {
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
               \`;
               statusMessages.appendChild(alertDiv);
-              
-              // Auto-dismiss after 5 seconds
               setTimeout(() => {
                 const bsAlert = new bootstrap.Alert(alertDiv);
                 bsAlert.close();
               }, 5000);
             }
             
-            // Function to load publishers from the API
             loadPublishersBtn.addEventListener('click', function() {
               const envUrl = envUrlInput.value.trim();
               if (!envUrl) {
                 showStatusMessage('Please enter a Dataverse Environment URL first', 'warning');
                 return;
               }
-              
-              // Show loading spinner
               publisherLoading.style.display = 'inline-block';
               loadPublishersBtn.disabled = true;
               loadPublishersBtn.textContent = 'Loading...';
-              
-              // Fetch publishers
               fetch('/api/fetch-publishers?url=' + encodeURIComponent(envUrl))
                 .then(response => {
                   if (!response.ok) {
@@ -820,7 +803,6 @@ app.get('/', (req, res) => {
                   while (publisherDropdown.options.length > 1) {
                     publisherDropdown.remove(1);
                   }
-                  
                   if (data.publishers && data.publishers.length > 0) {
                     data.publishers.forEach(publisher => {
                       const option = document.createElement('option');
@@ -849,7 +831,6 @@ app.get('/', (req, res) => {
                   loadPublishersBtn.textContent = 'Load Publishers';
                 });
             });
-            
             publisherDropdown.addEventListener('change', function() {
               const selectedPrefix = this.value;
               prefixInput.value = selectedPrefix ? (selectedPrefix + '_') : '';
@@ -857,7 +838,6 @@ app.get('/', (req, res) => {
                 showStatusMessage(\`Selected publisher prefix: \${selectedPrefix}_\`, 'info');
               }
             });
-            
             if (sessionStorage.getItem('returnUrl')) {
               sessionStorage.removeItem('returnUrl');
               showStatusMessage('Authentication successful! You can now load publishers.', 'success');
@@ -1248,35 +1228,38 @@ app.post('/generate-docs', async (req, res) => {
   const prefix = req.body.prefix || '';
   
   try {
-    // Show loading page with Elections Canada branding
+    // Show loading page with Agency branding
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Generating Documentation - Elections Canada</title>
+        <title>Generating Documentation - ${AGENCY_NAME}</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
           :root {
-            --ec-header-bg: #26374a;
-            --gc-blue: #26374a;
-            --gc-red: #af3c43;
+            --agency-header-bg: ${AGENCY_BRANDING.headerBgColor};
+            --agency-accent: ${AGENCY_BRANDING.accentColor};
           }
           
           * { box-sizing: border-box; }
           body { margin: 0; padding: 0; font-family: 'Noto Sans', Arial, sans-serif; background-color: #f8f9fa; }
           
           .gc-header {
-            background-color: var(--ec-header-bg);
+            background-color: var(--agency-header-bg);
             padding: 0 20px;
             height: 70px;
             display: flex;
             align-items: center;
           }
           
-          .gc-header img { height: 40px; }
+          .gc-header-logo-name {
+            color: white;
+            font-size: 1.25rem;
+            font-weight: 700;
+          }
           
           .gc-header-logo-text {
             color: white;
@@ -1289,7 +1272,7 @@ app.post('/generate-docs', async (req, res) => {
           
           .gc-red-bar {
             height: 4px;
-            background-color: var(--gc-red);
+            background-color: var(--agency-accent);
           }
           
           html, body { height: 100%; }
@@ -1318,24 +1301,24 @@ app.post('/generate-docs', async (req, res) => {
             width: 5rem;
             height: 5rem;
             margin-bottom: 1.5rem;
-            color: var(--gc-blue);
+            color: var(--agency-header-bg);
           }
           
           .page-title {
-            color: var(--gc-blue);
+            color: var(--agency-header-bg);
             font-weight: 600;
           }
           
-          .badge-ec {
-            background-color: var(--gc-red);
+          .badge-agency {
+            background-color: var(--agency-accent);
           }
           
           .progress-bar {
-            background-color: var(--gc-blue);
+            background-color: var(--agency-header-bg);
           }
           
           .gc-footer {
-            background-color: var(--ec-header-bg);
+            background-color: var(--agency-header-bg);
             color: white;
             padding: 20px;
             text-align: center;
@@ -1346,7 +1329,7 @@ app.post('/generate-docs', async (req, res) => {
       <body>
         <div class="page-wrapper">
           <header class="gc-header">
-            <span style="color: white; font-size: 1.25rem; font-weight: 700;">Elections Canada</span>
+            <span class="gc-header-logo-name">${AGENCY_NAME}</span>
             <span class="gc-header-logo-text">API Explorer</span>
           </header>
           <div class="gc-red-bar"></div>
@@ -1358,7 +1341,7 @@ app.post('/generate-docs', async (req, res) => {
               </div>
               <h1 class="h3 mb-3 page-title">Generating API Documentation</h1>
               <p class="text-muted">Fetching metadata from Dataverse and processing...</p>
-              ${prefix ? `<p class="badge badge-ec text-white">Filtering by prefix: ${prefix}</p>` : ''}
+              ${prefix ? `<p class="badge badge-agency text-white">Filtering by prefix: ${prefix}</p>` : ''}
               ${PATH_FILTER ? `<p class="badge bg-secondary ms-1">Path filter: ${PATH_FILTER}</p>` : ''}
               <div class="progress mt-4">
                 <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
@@ -1367,7 +1350,7 @@ app.post('/generate-docs', async (req, res) => {
           </main>
           
           <footer class="gc-footer">
-            <div>© Elections Canada</div>
+            <div>${AGENCY_BRANDING.footerText}</div>
           </footer>
         </div>
         <script>
@@ -1640,14 +1623,13 @@ app.get('/api-docs', (req, res) => {
     <html lang="en">
     <head>
       <meta charset="UTF-8">
-      <title>API Documentation - Elections Canada</title>
+      <title>API Documentation - ${AGENCY_NAME}</title>
       <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
       <style>
         :root {
-          --ec-header-bg: #26374a;
-          --gc-blue: #26374a;
-          --gc-red: #af3c43;
+          --agency-header-bg: ${AGENCY_BRANDING.headerBgColor};
+          --agency-accent: ${AGENCY_BRANDING.accentColor};
         }
         
         html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
@@ -1656,7 +1638,7 @@ app.get('/api-docs', (req, res) => {
         .swagger-ui .topbar { display: none; }
         
         .gc-header {
-          background-color: var(--ec-header-bg);
+          background-color: var(--agency-header-bg);
           padding: 0 20px;
           height: 70px;
           display: flex;
@@ -1671,8 +1653,10 @@ app.get('/api-docs', (req, res) => {
           gap: 15px;
         }
         
-        .gc-header-logo img {
-          height: 40px;
+        .gc-header-logo-name {
+          color: white;
+          font-size: 1.25rem;
+          font-weight: 700;
         }
         
         .gc-header-logo-text {
@@ -1705,11 +1689,11 @@ app.get('/api-docs', (req, res) => {
         
         .gc-red-bar {
           height: 4px;
-          background-color: var(--gc-red);
+          background-color: var(--agency-accent);
         }
         
         .auth-badge {
-          background-color: var(--gc-red);
+          background-color: var(--agency-accent);
           color: white;
           padding: 4px 10px;
           border-radius: 4px;
@@ -1745,7 +1729,7 @@ app.get('/api-docs', (req, res) => {
         }
         
         .token-helper button {
-          background-color: var(--gc-blue);
+          background-color: var(--agency-header-bg);
           color: white;
           border: none;
           padding: 0.5rem 1rem;
@@ -1756,7 +1740,7 @@ app.get('/api-docs', (req, res) => {
         }
         
         .token-helper button:hover {
-          background-color: #1c2a38;
+          opacity: 0.9;
         }
         
         .token-helper button:disabled {
@@ -1795,18 +1779,17 @@ app.get('/api-docs', (req, res) => {
           font-family: 'Noto Sans', Arial, sans-serif;
         }
         
-        /* Override some Swagger UI styles */
         .swagger-ui .info .title {
-          color: var(--gc-blue);
+          color: var(--agency-header-bg);
         }
         
         .swagger-ui .btn.execute {
-          background-color: var(--gc-blue);
-          border-color: var(--gc-blue);
+          background-color: var(--agency-header-bg);
+          border-color: var(--agency-header-bg);
         }
         
         .swagger-ui .btn.execute:hover {
-          background-color: #1c2a38;
+          opacity: 0.9;
         }
       </style>
     </head>
@@ -1815,7 +1798,7 @@ app.get('/api-docs', (req, res) => {
       
       <header class="gc-header">
         <div class="gc-header-logo">
-          <span style="color: white; font-size: 1.25rem; font-weight: 700;">Elections Canada</span>
+          <span class="gc-header-logo-name">${AGENCY_NAME}</span>
           <span class="gc-header-logo-text">API Documentation</span>
           <span class="auth-badge ${authType === 'application' ? '' : 'user'}">${authType === 'application' ? 'Application' : 'User'}</span>
         </div>
@@ -2316,15 +2299,15 @@ const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`
 ╔════════════════════════════════════════════════════════════╗
-║  Elections Canada - Dataverse API Explorer                 ║
-║  Server running on http://localhost:${port}                     ║
-║                                                            ║
-║  Environment information:                                  ║
-║  - Dataverse URL: ${process.env.dataverse_url ? 'Configured ✓' : 'Not set ✗'}                       ║
-║  - Client Secret: ${process.env.client_secret ? 'Configured ✓' : 'Not set ✗'}                       ║
-║  - Session Secret: ${process.env.session_secret ? 'Configured ✓' : 'Not set ✗'}                     ║
-║  - Tenant ID: ${(process.env.tenant_id || 'Default').substring(0, 20).padEnd(20)}               ║
-║  - Path Filter: ${(PATH_FILTER || 'None').substring(0, 18).padEnd(18)}                 ║
+║  ${AGENCY_NAME} - Dataverse API Explorer
+║  Server running on http://localhost:${port}
+║                                                            
+║  Environment information:                                  
+║  - Agency Name: ${AGENCY_NAME}
+║  - Dataverse URL: ${process.env.dataverse_url ? 'Configured ✓' : 'Not set ✗'}
+║  - Client Secret: ${process.env.client_secret ? 'Configured ✓' : 'Not set ✗'}
+║  - Session Secret: ${process.env.session_secret ? 'Configured ✓' : 'Not set ✗'}
+║  - Path Filter: ${PATH_FILTER || 'None (showing all paths)'}
 ╚════════════════════════════════════════════════════════════╝
 `);
 });
