@@ -23,7 +23,7 @@ fi
 
 # Check Web App exists
 if ! az webapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
-  echo "❌ Error: Web App '$APP_NAME' not found. Run ./1-create-resources.sh first"
+  echo "❌ Error: Web App '$APP_NAME' not found. Run ./1-create-azure-resource.sh first"
   exit 1
 fi
 
@@ -43,11 +43,59 @@ case $CHOICE in
       exit 1
     fi
     
+    # Check for schema file if SCHEMA_FILE_PATH is configured
+    if [ -n "$SCHEMA_FILE_PATH" ]; then
+      # Resolve schema path relative to APP_DIR
+      SCHEMA_FULL_PATH="$APP_DIR/$SCHEMA_FILE_PATH"
+      # Remove leading ./ if present for cleaner path resolution
+      SCHEMA_FULL_PATH="${SCHEMA_FULL_PATH/\/.\//\/}"
+      
+      if [ ! -f "$SCHEMA_FULL_PATH" ]; then
+        echo ""
+        echo "⚠️  Warning: Schema file not found at: $SCHEMA_FULL_PATH"
+        echo "   SCHEMA_FILE_PATH is set to: $SCHEMA_FILE_PATH"
+        echo ""
+        read -p "Continue without schema file? [y/N]: " CONTINUE
+        if [ "$CONTINUE" != "y" ] && [ "$CONTINUE" != "Y" ]; then
+          echo "❌ Deployment cancelled. Add schema file and retry."
+          exit 1
+        fi
+      else
+        echo "✓ Schema file found: $SCHEMA_FILE_PATH"
+        
+        # Validate JSON syntax
+        if command -v jq &>/dev/null; then
+          if ! jq empty "$SCHEMA_FULL_PATH" 2>/dev/null; then
+            echo "❌ Error: Schema file has invalid JSON syntax"
+            exit 1
+          fi
+          TABLE_COUNT=$(jq '.tables | length' "$SCHEMA_FULL_PATH")
+          echo "  📋 Tables defined: $TABLE_COUNT"
+          if [ -n "$PUBLISHER_PREFIX" ]; then
+            echo "  📋 Publisher prefix: $PUBLISHER_PREFIX"
+          fi
+        fi
+      fi
+    fi
+    
     cd "$APP_DIR"
     rm -f deploy.zip
     
+    echo ""
     echo "📦 Packaging..."
+    
+    # Include schema file in deployment (don't exclude it!)
     zip -rq deploy.zip . -x "node_modules/*" ".git/*" ".env" "deploy/*" "*.zip" ".DS_Store" "temp/*"
+    
+    # Verify schema is in the zip if configured
+    if [ -n "$SCHEMA_FILE_PATH" ]; then
+      SCHEMA_IN_ZIP=$(unzip -l deploy.zip | grep -c "${SCHEMA_FILE_PATH#./}" || true)
+      if [ "$SCHEMA_IN_ZIP" -gt 0 ]; then
+        echo "   ✓ Schema file included in package"
+      else
+        echo "   ⚠️  Schema file may not be in package - check path"
+      fi
+    fi
     
     echo "☁️  Uploading..."
     az webapp deployment source config-zip --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --src deploy.zip --output none
@@ -90,6 +138,12 @@ case $CHOICE in
       
       az webapp deployment source config --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --repo-url "$REPO" --branch "$BRANCH" --manual-integration
       echo "✅ Configured: $REPO ($BRANCH)"
+      
+      if [ -n "$SCHEMA_FILE_PATH" ]; then
+        echo ""
+        echo "⚠️  Important: Ensure '$SCHEMA_FILE_PATH' exists in your repository!"
+        echo "   The schema file must be committed to: $REPO"
+      fi
     fi
     ;;
     
@@ -102,4 +156,9 @@ esac
 echo ""
 echo "🌐 App: https://${APP_NAME}.azurewebsites.net"
 echo ""
+if [ -n "$SCHEMA_FILE_PATH" ]; then
+  echo "📋 API docs will show tables from: $SCHEMA_FILE_PATH"
+  echo "   With prefix: ${PUBLISHER_PREFIX:-none}"
+  echo ""
+fi
 echo "📌 Next: ./4-https-only.sh"

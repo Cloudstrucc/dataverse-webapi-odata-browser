@@ -1,0 +1,103 @@
+# =============================================================================
+# Azure App Service Deployment Configuration
+# =============================================================================
+# Copy this file to .env and fill in your values
+# DO NOT commit .env to source control - it contains secrets!
+# =============================================================================
+
+# =============================================================================
+# REQUIRED: Azure Resource Configuration
+# =============================================================================
+# Globally unique name for your Azure Web App (will be: https://<APP_NAME>.azurewebsites.net)
+APP_NAME=your-app-name
+
+# Azure Resource Group name (will be created if it doesn't exist)
+RESOURCE_GROUP=rg-your-app-prod
+
+# Azure region for deployment
+# Options: canadacentral, canadaeast, eastus, westus2, etc.
+LOCATION=canadacentral
+
+# =============================================================================
+# REQUIRED: Azure AD Configuration
+# =============================================================================
+# From your Azure AD App Registration (portal.azure.com > Azure Active Directory > App registrations)
+
+# Application (client) ID
+client_id=00000000-0000-0000-0000-000000000000
+
+# Directory (tenant) ID
+tenant_id=00000000-0000-0000-0000-000000000000
+
+# Client secret (Certificates & secrets > New client secret)
+# ⚠️  NEVER commit this value to source control!
+client_secret=your-client-secret-here
+
+# =============================================================================
+# Application Configuration
+# =============================================================================
+# Session encryption key - leave as RANDOM_SESSION_SECRET to auto-generate
+# Or provide your own: openssl rand -base64 32
+session_secret=RANDOM_SESSION_SECRET
+
+# =============================================================================
+# REQUIRED: Dataverse Configuration
+# =============================================================================
+# Your Dataverse environment URL (Power Platform admin center > Environments)
+# Format: https://<org-name>.crm.dynamics.com/ (note the trailing slash)
+# Canada: .crm3.dynamics.com | US: .crm.dynamics.com | Europe: .crm4.dynamics.com
+dataverse_url=https://your-org.crm3.dynamics.com/
+
+# =============================================================================
+# OAuth Configuration
+# =============================================================================
+# OAuth scopes for Dataverse API access
+# Format: https://<your-dataverse-url>/.default
+scopes=https://your-org.crm3.dynamics.com/.default
+app_scopes=https://your-org.crm3.dynamics.com/.default
+
+# Redirect URI for OAuth callback
+# ⚠️  This MUST be registered in your Azure AD App Registration under "Redirect URIs"
+# For local development: http://localhost:3000/auth/callback
+# For Azure deployment: https://<APP_NAME>.azurewebsites.net/auth/callback
+redirectUri=http://localhost:3000/auth/callback
+
+# =============================================================================
+# Schema Configuration (OPTIONAL)
+# =============================================================================
+# Choose ONE filtering method: SCHEMA_FILE_PATH or PATH_FILTER
+
+# OPTION 1: Schema-based filtering (recommended for custom tables)
+# ----------------------------------------------------------------
+# Path to your schema JSON file (relative to server.js)
+# When set, OpenAPI docs are generated from this file instead of querying Dataverse
+# SCHEMA_FILE_PATH=./your-schema.json
+
+# Publisher prefix for custom tables (e.g., "cr123" or "contoso")
+# Table "envelope" becomes "cr123_envelope" in API paths
+# PUBLISHER_PREFIX=cr123
+
+# OPTION 2: Path-based filtering
+# ----------------------------------------------------------------
+# Filter Dataverse entities by pattern (case-insensitive contains)
+# Examples:
+#   PATH_FILTER=contact           -> paths containing "contact"
+#   PATH_FILTER=(account|contact) -> paths containing "account" OR "contact"
+# PATH_FILTER=
+
+# =============================================================================
+# Agency Branding (OPTIONAL)
+# =============================================================================
+# Customize the UI appearance for your organization
+
+# Organization name displayed in the header
+AGENCY_NAME=Your Organization
+
+# Link for the organization logo/name
+AGENCY_URL=https://www.your-org.com
+
+# Header background color (hex)
+AGENCY_HEADER_BG=#26374a
+
+# Accent color for buttons and highlights (hex)
+AGENCY_ACCENT_COLOR=#0056b3
