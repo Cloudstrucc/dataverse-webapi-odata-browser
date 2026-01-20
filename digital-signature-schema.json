@@ -1,0 +1,257 @@
+{
+  "tables": [
+    {
+      "logicalName": "envelope",
+      "displayName": "Envelope",
+      "displayNamePlural": "Envelopes",
+      "description": "Envelope container for documents requiring signatures",
+      "primaryAttribute": {
+        "schemaName": "Name",
+        "displayName": "Envelope Name",
+        "description": "Name of the envelope",
+        "maxLength": 200
+      },
+      "attributes": [
+        { "logicalName": "envelopeid", "schemaName": "EnvelopeId", "displayName": "Envelope ID", "description": "Unique envelope identifier from Nintex", "type": "String", "maxLength": 100 },
+        { "logicalName": "preparedenvelopeid", "schemaName": "PreparedEnvelopeId", "displayName": "Prepared Envelope ID", "description": "ID for prepared envelopes awaiting submission", "type": "String", "maxLength": 100 },
+        { "logicalName": "templateid", "schemaName": "TemplateId", "displayName": "Template ID", "description": "Simple Setup template identifier", "type": "String", "maxLength": 100 },
+        { "logicalName": "status", "schemaName": "Status", "displayName": "Status", "description": "Envelope status (Pending, InProcess, Completed, Cancelled, Declined, Expired)", "type": "String", "maxLength": 50 },
+        { "logicalName": "subject", "schemaName": "Subject", "displayName": "Subject", "description": "Email subject line", "type": "String", "maxLength": 500 },
+        { "logicalName": "message", "schemaName": "Message", "displayName": "Message", "description": "Email message body", "type": "Memo", "maxLength": 10000 },
+        { "logicalName": "sentdate", "schemaName": "SentDate", "displayName": "Sent Date", "description": "When envelope was sent", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "completeddate", "schemaName": "CompletedDate", "displayName": "Completed Date", "description": "When all signing completed", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "expirationdate", "schemaName": "ExpirationDate", "displayName": "Expiration Date", "description": "When envelope expires", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "daystoexpire", "schemaName": "DaysToExpire", "displayName": "Days to Expire", "description": "Number of days until expiration", "type": "Integer", "minValue": 0, "maxValue": 365 },
+        { "logicalName": "reminderfrequency", "schemaName": "ReminderFrequency", "displayName": "Reminder Frequency", "description": "Days between reminder emails", "type": "Integer", "minValue": 0, "maxValue": 365 },
+        { "logicalName": "redirecturl", "schemaName": "RedirectUrl", "displayName": "Redirect URL", "description": "URL to redirect after signing", "type": "String", "maxLength": 2000, "format": "Url" },
+        { "logicalName": "callbackurl", "schemaName": "CallbackUrl", "displayName": "Callback URL", "description": "Webhook callback URL", "type": "String", "maxLength": 2000, "format": "Url" },
+        { "logicalName": "requestbody", "schemaName": "RequestBody", "displayName": "Request Body", "description": "Complete JSON request sent to Nintex API", "type": "Memo", "maxLength": 1048576 },
+        { "logicalName": "responsebody", "schemaName": "ResponseBody", "displayName": "Response Body", "description": "Complete JSON response from Nintex API", "type": "Memo", "maxLength": 1048576 },
+        { "logicalName": "iscancelled", "schemaName": "IsCancelled", "displayName": "Is Cancelled", "description": "Whether envelope was cancelled", "type": "Boolean" },
+        { "logicalName": "cancelleddate", "schemaName": "CancelledDate", "displayName": "Cancelled Date", "description": "When envelope was cancelled", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "processingmode", "schemaName": "ProcessingMode", "displayName": "Processing Mode", "description": "Sequential or parallel signing", "type": "String", "maxLength": 50 }
+      ]
+    },
+    {
+      "logicalName": "document",
+      "displayName": "Document",
+      "displayNamePlural": "Documents",
+      "description": "Documents within envelopes",
+      "primaryAttribute": { "schemaName": "Name", "displayName": "Document Name", "description": "Name of the document", "maxLength": 200 },
+      "attributes": [
+        { "logicalName": "documentid", "schemaName": "DocumentId", "displayName": "Document ID", "description": "Nintex document identifier", "type": "String", "maxLength": 100 },
+        { "logicalName": "envelopeid", "schemaName": "EnvelopeId", "displayName": "Envelope ID", "description": "Parent envelope", "type": "String", "maxLength": 100 },
+        { "logicalName": "filename", "schemaName": "FileName", "displayName": "File Name", "description": "Original filename", "type": "String", "maxLength": 255 },
+        { "logicalName": "fileextension", "schemaName": "FileExtension", "displayName": "File Extension", "description": "File extension (pdf, docx, etc)", "type": "String", "maxLength": 10 },
+        { "logicalName": "filecontent", "schemaName": "FileContent", "displayName": "File Content", "description": "Base64 encoded file data", "type": "Memo", "maxLength": 1048576 },
+        { "logicalName": "signedcontent", "schemaName": "SignedContent", "displayName": "Signed Content", "description": "Base64 encoded signed document", "type": "Memo", "maxLength": 1048576 },
+        { "logicalName": "documentorder", "schemaName": "DocumentOrder", "displayName": "Document Order", "description": "Order in envelope", "type": "Integer", "minValue": 0, "maxValue": 100 },
+        { "logicalName": "pagecount", "schemaName": "PageCount", "displayName": "Page Count", "description": "Number of pages", "type": "Integer", "minValue": 0, "maxValue": 10000 },
+        { "logicalName": "documenttype", "schemaName": "DocumentType", "displayName": "Document Type", "description": "Type of document (Original, Signed, Combined, Audit)", "type": "String", "maxLength": 50 }
+      ]
+    },
+    {
+      "logicalName": "signer",
+      "displayName": "Signer",
+      "displayNamePlural": "Signers",
+      "description": "Envelope signers and their signing status",
+      "primaryAttribute": { "schemaName": "Name", "displayName": "Signer Name", "description": "Full name of signer", "maxLength": 200 },
+      "attributes": [
+        { "logicalName": "signerid", "schemaName": "SignerId", "displayName": "Signer ID", "description": "Nintex signer identifier", "type": "String", "maxLength": 100 },
+        { "logicalName": "envelopesignerid", "schemaName": "EnvelopeSignerId", "displayName": "Envelope Signer ID", "description": "Signer ID within envelope", "type": "String", "maxLength": 100 },
+        { "logicalName": "envelopeid", "schemaName": "EnvelopeId", "displayName": "Envelope ID", "description": "Parent envelope", "type": "String", "maxLength": 100 },
+        { "logicalName": "email", "schemaName": "Email", "displayName": "Email", "description": "Signer email address", "type": "String", "maxLength": 100, "format": "Email" },
+        { "logicalName": "fullname", "schemaName": "FullName", "displayName": "Full Name", "description": "Signer full name", "type": "String", "maxLength": 200 },
+        { "logicalName": "signerorder", "schemaName": "SignerOrder", "displayName": "Signer Order", "description": "Signing sequence order", "type": "Integer", "minValue": 0, "maxValue": 100 },
+        { "logicalName": "signerstatus", "schemaName": "SignerStatus", "displayName": "Signer Status", "description": "Status (Pending, Signed, Declined, Delegated)", "type": "String", "maxLength": 50 },
+        { "logicalName": "signeddate", "schemaName": "SignedDate", "displayName": "Signed Date", "description": "When signer completed", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "vieweddate", "schemaName": "ViewedDate", "displayName": "Viewed Date", "description": "First view date", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "declineddate", "schemaName": "DeclinedDate", "displayName": "Declined Date", "description": "When declined", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "declinedreason", "schemaName": "DeclinedReason", "displayName": "Declined Reason", "description": "Reason for declining", "type": "Memo", "maxLength": 2000 },
+        { "logicalName": "phonenumber", "schemaName": "PhoneNumber", "displayName": "Phone Number", "description": "Mobile phone for SMS", "type": "String", "maxLength": 50, "format": "Phone" },
+        { "logicalName": "language", "schemaName": "Language", "displayName": "Language", "description": "Language culture code (en-US, fr-FR)", "type": "String", "maxLength": 10 },
+        { "logicalName": "authenticationtype", "schemaName": "AuthenticationType", "displayName": "Authentication Type", "description": "Auth method (None, Password, SMS, KBA)", "type": "String", "maxLength": 50 },
+        { "logicalName": "password", "schemaName": "Password", "displayName": "Password", "description": "Access password/PIN", "type": "String", "maxLength": 50 },
+        { "logicalName": "signinglink", "schemaName": "SigningLink", "displayName": "Signing Link", "description": "Direct signing URL", "type": "String", "maxLength": 2000, "format": "Url" },
+        { "logicalName": "delegatedto", "schemaName": "DelegatedTo", "displayName": "Delegated To", "description": "Email if delegated to another signer", "type": "String", "maxLength": 100, "format": "Email" },
+        { "logicalName": "signatureimage", "schemaName": "SignatureImage", "displayName": "Signature Image", "description": "Base64 signature image", "type": "Memo", "maxLength": 1048576 }
+      ]
+    },
+    {
+      "logicalName": "field",
+      "displayName": "Field",
+      "displayNamePlural": "Fields",
+      "description": "JotBlocks - signature fields, text fields, checkboxes, etc",
+      "primaryAttribute": { "schemaName": "Name", "displayName": "Field Name", "description": "JotBlock name", "maxLength": 200 },
+      "attributes": [
+        { "logicalName": "fieldid", "schemaName": "FieldId", "displayName": "Field ID", "description": "Nintex field identifier", "type": "String", "maxLength": 100 },
+        { "logicalName": "documentid", "schemaName": "DocumentId", "displayName": "Document ID", "description": "Parent document", "type": "String", "maxLength": 100 },
+        { "logicalName": "envelopeid", "schemaName": "EnvelopeId", "displayName": "Envelope ID", "description": "Parent envelope", "type": "String", "maxLength": 100 },
+        { "logicalName": "signerid", "schemaName": "SignerId", "displayName": "Signer ID", "description": "Assigned signer", "type": "String", "maxLength": 100 },
+        { "logicalName": "fieldtype", "schemaName": "FieldType", "displayName": "Field Type", "description": "Type (signature, initial, text, date, checkbox, radio, attachment)", "type": "String", "maxLength": 50 },
+        { "logicalName": "inputtype", "schemaName": "InputType", "displayName": "Input Type", "description": "Input method (signatory, text, draw, type, stamp)", "type": "String", "maxLength": 50 },
+        { "logicalName": "positionx", "schemaName": "PositionX", "displayName": "Position X", "description": "X coordinate (0-1 relative)", "type": "Decimal", "precision": 10, "scale": 4 },
+        { "logicalName": "positiony", "schemaName": "PositionY", "displayName": "Position Y", "description": "Y coordinate (0-1 relative)", "type": "Decimal", "precision": 10, "scale": 4 },
+        { "logicalName": "width", "schemaName": "Width", "displayName": "Width", "description": "Width (0-1 relative)", "type": "Decimal", "precision": 10, "scale": 4 },
+        { "logicalName": "height", "schemaName": "Height", "displayName": "Height", "description": "Height (0-1 relative)", "type": "Decimal", "precision": 10, "scale": 4 },
+        { "logicalName": "pagenumber", "schemaName": "PageNumber", "displayName": "Page Number", "description": "Page location", "type": "Integer", "minValue": 1, "maxValue": 10000 },
+        { "logicalName": "isrequired", "schemaName": "IsRequired", "displayName": "Is Required", "description": "Must be completed", "type": "Boolean" },
+        { "logicalName": "value", "schemaName": "Value", "displayName": "Value", "description": "Field value or content", "type": "Memo", "maxLength": 10000 },
+        { "logicalName": "defaultvalue", "schemaName": "DefaultValue", "displayName": "Default Value", "description": "Pre-populated value", "type": "String", "maxLength": 500 },
+        { "logicalName": "instructions", "schemaName": "Instructions", "displayName": "Instructions", "description": "Field instructions", "type": "Memo", "maxLength": 2000 },
+        { "logicalName": "readonly", "schemaName": "ReadOnly", "displayName": "Read Only", "description": "Cannot be edited", "type": "Boolean" },
+        { "logicalName": "validationregex", "schemaName": "ValidationRegex", "displayName": "Validation Regex", "description": "Validation pattern", "type": "String", "maxLength": 500 },
+        { "logicalName": "minlength", "schemaName": "MinLength", "displayName": "Min Length", "description": "Minimum text length", "type": "Integer", "minValue": 0, "maxValue": 10000 },
+        { "logicalName": "maxlength", "schemaName": "MaxLength", "displayName": "Max Length", "description": "Maximum text length", "type": "Integer", "minValue": 0, "maxValue": 10000 },
+        { "logicalName": "groupname", "schemaName": "GroupName", "displayName": "Group Name", "description": "Radio button group name", "type": "String", "maxLength": 100 }
+      ]
+    },
+    {
+      "logicalName": "template",
+      "displayName": "Template",
+      "displayNamePlural": "Templates",
+      "description": "Simple Setup reusable templates",
+      "primaryAttribute": { "schemaName": "Name", "displayName": "Template Name", "description": "Template name", "maxLength": 200 },
+      "attributes": [
+        { "logicalName": "templateid", "schemaName": "TemplateId", "displayName": "Template ID", "description": "Nintex template identifier", "type": "String", "maxLength": 100 },
+        { "logicalName": "description", "schemaName": "Description", "displayName": "Description", "description": "Template description", "type": "Memo", "maxLength": 2000 },
+        { "logicalName": "category", "schemaName": "Category", "displayName": "Category", "description": "Template category", "type": "String", "maxLength": 100 },
+        { "logicalName": "isactive", "schemaName": "IsActive", "displayName": "Is Active", "description": "Template is active", "type": "Boolean" },
+        { "logicalName": "ispublic", "schemaName": "IsPublic", "displayName": "Is Public", "description": "Shared template", "type": "Boolean" },
+        { "logicalName": "createddate", "schemaName": "CreatedDate", "displayName": "Created Date", "description": "Creation date", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "modifieddate", "schemaName": "ModifiedDate", "displayName": "Modified Date", "description": "Last modified", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "templatejson", "schemaName": "TemplateJson", "displayName": "Template JSON", "description": "Complete template definition", "type": "Memo", "maxLength": 1048576 }
+      ]
+    },
+    {
+      "logicalName": "senderinput",
+      "displayName": "Sender Input",
+      "displayNamePlural": "Sender Inputs",
+      "description": "Template sender inputs for dynamic values",
+      "primaryAttribute": { "schemaName": "Name", "displayName": "Input Name", "description": "Sender input name", "maxLength": 200 },
+      "attributes": [
+        { "logicalName": "templateid", "schemaName": "TemplateId", "displayName": "Template ID", "description": "Parent template", "type": "String", "maxLength": 100 },
+        { "logicalName": "envelopeid", "schemaName": "EnvelopeId", "displayName": "Envelope ID", "description": "Envelope using this input", "type": "String", "maxLength": 100 },
+        { "logicalName": "inputname", "schemaName": "InputName", "displayName": "Input Name", "description": "Name of sender input", "type": "String", "maxLength": 100 },
+        { "logicalName": "inputvalue", "schemaName": "InputValue", "displayName": "Input Value", "description": "Value provided", "type": "Memo", "maxLength": 10000 },
+        { "logicalName": "inputtype", "schemaName": "InputType", "displayName": "Input Type", "description": "Type (Text, Date, Number, Email, etc)", "type": "String", "maxLength": 50 }
+      ]
+    },
+    {
+      "logicalName": "authtoken",
+      "displayName": "Auth Token",
+      "displayNamePlural": "Auth Tokens",
+      "description": "Nintex API authentication tokens",
+      "primaryAttribute": { "schemaName": "Name", "displayName": "Token Name", "description": "Token identifier", "maxLength": 200 },
+      "attributes": [
+        { "logicalName": "token", "schemaName": "Token", "displayName": "Token", "description": "Bearer token value", "type": "Memo", "maxLength": 10000 },
+        { "logicalName": "apiusername", "schemaName": "ApiUsername", "displayName": "API Username", "description": "Nintex API username", "type": "String", "maxLength": 100 },
+        { "logicalName": "apikey", "schemaName": "ApiKey", "displayName": "API Key", "description": "API key for authentication", "type": "String", "maxLength": 200 },
+        { "logicalName": "contextusername", "schemaName": "ContextUsername", "displayName": "Context Username", "description": "AssureSign user context (email)", "type": "String", "maxLength": 100, "format": "Email" },
+        { "logicalName": "issuedat", "schemaName": "IssuedAt", "displayName": "Issued At", "description": "Token issue time", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "expiresat", "schemaName": "ExpiresAt", "displayName": "Expires At", "description": "Token expiration", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "sessionlength", "schemaName": "SessionLength", "displayName": "Session Length", "description": "Session length in minutes", "type": "Integer", "minValue": 1, "maxValue": 1440 },
+        { "logicalName": "isactive", "schemaName": "IsActive", "displayName": "Is Active", "description": "Token is valid", "type": "Boolean" }
+      ]
+    },
+    {
+      "logicalName": "webhook",
+      "displayName": "Webhook",
+      "displayNamePlural": "Webhooks",
+      "description": "Event notifications from Nintex",
+      "primaryAttribute": { "schemaName": "Name", "displayName": "Webhook Name", "description": "Webhook identifier", "maxLength": 200 },
+      "attributes": [
+        { "logicalName": "webhookid", "schemaName": "WebhookId", "displayName": "Webhook ID", "description": "Unique identifier", "type": "String", "maxLength": 100 },
+        { "logicalName": "envelopeid", "schemaName": "EnvelopeId", "displayName": "Envelope ID", "description": "Related envelope", "type": "String", "maxLength": 100 },
+        { "logicalName": "eventtype", "schemaName": "EventType", "displayName": "Event Type", "description": "Event (Signed, Declined, Completed, Cancelled, Viewed)", "type": "String", "maxLength": 50 },
+        { "logicalName": "eventdate", "schemaName": "EventDate", "displayName": "Event Date", "description": "When event occurred", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "payload", "schemaName": "Payload", "displayName": "Payload", "description": "Full JSON payload from Nintex", "type": "Memo", "maxLength": 1048576 },
+        { "logicalName": "processed", "schemaName": "Processed", "displayName": "Processed", "description": "Webhook processed", "type": "Boolean" },
+        { "logicalName": "processeddate", "schemaName": "ProcessedDate", "displayName": "Processed Date", "description": "Processing date", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "errorlog", "schemaName": "ErrorLog", "displayName": "Error Log", "description": "Processing errors", "type": "Memo", "maxLength": 10000 }
+      ]
+    },
+    {
+      "logicalName": "apirequest",
+      "displayName": "API Request",
+      "displayNamePlural": "API Requests",
+      "description": "Log of Nintex API requests",
+      "primaryAttribute": { "schemaName": "Name", "displayName": "Request Name", "description": "Request description", "maxLength": 200 },
+      "attributes": [
+        { "logicalName": "requestid", "schemaName": "RequestId", "displayName": "Request ID", "description": "Unique request ID", "type": "String", "maxLength": 100 },
+        { "logicalName": "endpoint", "schemaName": "Endpoint", "displayName": "Endpoint", "description": "API endpoint called", "type": "String", "maxLength": 500 },
+        { "logicalName": "method", "schemaName": "Method", "displayName": "Method", "description": "HTTP method (GET, POST, PUT, DELETE)", "type": "String", "maxLength": 10 },
+        { "logicalName": "requestbody", "schemaName": "RequestBody", "displayName": "Request Body", "description": "JSON request payload", "type": "Memo", "maxLength": 1048576 },
+        { "logicalName": "responsebody", "schemaName": "ResponseBody", "displayName": "Response Body", "description": "JSON response payload", "type": "Memo", "maxLength": 1048576 },
+        { "logicalName": "statuscode", "schemaName": "StatusCode", "displayName": "Status Code", "description": "HTTP status code", "type": "Integer", "minValue": 100, "maxValue": 599 },
+        { "logicalName": "requestdate", "schemaName": "RequestDate", "displayName": "Request Date", "description": "Request timestamp", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "responsetime", "schemaName": "ResponseTime", "displayName": "Response Time", "description": "Response time (ms)", "type": "Integer", "minValue": 0, "maxValue": 300000 },
+        { "logicalName": "success", "schemaName": "Success", "displayName": "Success", "description": "Request succeeded", "type": "Boolean" },
+        { "logicalName": "errormessage", "schemaName": "ErrorMessage", "displayName": "Error Message", "description": "Error details", "type": "Memo", "maxLength": 10000 },
+        { "logicalName": "authtoken", "schemaName": "AuthToken", "displayName": "Auth Token", "description": "Token used for request", "type": "String", "maxLength": 100 }
+      ]
+    },
+    {
+      "logicalName": "envelopehistory",
+      "displayName": "Envelope History",
+      "displayNamePlural": "Envelope History",
+      "description": "Audit trail of envelope events",
+      "primaryAttribute": { "schemaName": "Name", "displayName": "Event Name", "description": "History event", "maxLength": 200 },
+      "attributes": [
+        { "logicalName": "envelopeid", "schemaName": "EnvelopeId", "displayName": "Envelope ID", "description": "Related envelope", "type": "String", "maxLength": 100 },
+        { "logicalName": "eventtype", "schemaName": "EventType", "displayName": "Event Type", "description": "Type of event", "type": "String", "maxLength": 100 },
+        { "logicalName": "eventdate", "schemaName": "EventDate", "displayName": "Event Date", "description": "When event occurred", "type": "DateTime", "format": "DateAndTime" },
+        { "logicalName": "username", "schemaName": "UserName", "displayName": "User Name", "description": "User who triggered event", "type": "String", "maxLength": 200 },
+        { "logicalName": "ipaddress", "schemaName": "IpAddress", "displayName": "IP Address", "description": "IP address of user", "type": "String", "maxLength": 50 },
+        { "logicalName": "description", "schemaName": "Description", "displayName": "Description", "description": "Event description", "type": "Memo", "maxLength": 2000 }
+      ]
+    },
+    {
+      "logicalName": "accesslink",
+      "displayName": "Access Link",
+      "displayNamePlural": "Access Links",
+      "description": "Direct access links for viewing/signing",
+      "primaryAttribute": { "schemaName": "Name", "displayName": "Link Name", "description": "Access link identifier", "maxLength": 200 },
+      "attributes": [
+        { "logicalName": "envelopeid", "schemaName": "EnvelopeId", "displayName": "Envelope ID", "description": "Related envelope", "type": "String", "maxLength": 100 },
+        { "logicalName": "signerid", "schemaName": "SignerId", "displayName": "Signer ID", "description": "Related signer", "type": "String", "maxLength": 100 },
+        { "logicalName": "linkurl", "schemaName": "LinkUrl", "displayName": "Link URL", "description": "Full access URL", "type": "String", "maxLength": 2000, "format": "Url" },
+        { "logicalName": "linktype", "schemaName": "LinkType", "displayName": "Link Type", "description": "Type (Signing, View, Download)", "type": "String", "maxLength": 50 },
+        { "logicalName": "documenttype", "schemaName": "DocumentType", "displayName": "Document Type", "description": "Document type for link", "type": "String", "maxLength": 50 },
+        { "logicalName": "expiresat", "schemaName": "ExpiresAt", "displayName": "Expires At", "description": "Link expiration", "type": "DateTime", "format": "DateAndTime" }
+      ]
+    },
+    {
+      "logicalName": "useraccount",
+      "displayName": "User Account",
+      "displayNamePlural": "User Accounts",
+      "description": "AssureSign user accounts and environments",
+      "primaryAttribute": { "schemaName": "Name", "displayName": "Account Name", "description": "Account/environment name", "maxLength": 200 },
+      "attributes": [
+        { "logicalName": "username", "schemaName": "UserName", "displayName": "User Name", "description": "AssureSign username (email)", "type": "String", "maxLength": 100, "format": "Email" },
+        { "logicalName": "accountid", "schemaName": "AccountId", "displayName": "Account ID", "description": "Account identifier", "type": "String", "maxLength": 100 },
+        { "logicalName": "environmentid", "schemaName": "EnvironmentId", "displayName": "Environment ID", "description": "Environment identifier", "type": "String", "maxLength": 100 },
+        { "logicalName": "environmentname", "schemaName": "EnvironmentName", "displayName": "Environment Name", "description": "Environment display name", "type": "String", "maxLength": 200 },
+        { "logicalName": "contextidentifier", "schemaName": "ContextIdentifier", "displayName": "Context Identifier", "description": "Account context ID for API calls", "type": "String", "maxLength": 200 }
+      ]
+    },
+    {
+      "logicalName": "emailnotification",
+      "displayName": "Email Notification",
+      "displayNamePlural": "Email Notifications",
+      "description": "Custom email notifications for envelope events",
+      "primaryAttribute": { "schemaName": "Name", "displayName": "Notification Name", "description": "Notification name", "maxLength": 200 },
+      "attributes": [
+        { "logicalName": "envelopeid", "schemaName": "EnvelopeId", "displayName": "Envelope ID", "description": "Parent envelope", "type": "String", "maxLength": 100 },
+        { "logicalName": "emaildesignsetid", "schemaName": "EmailDesignSetId", "displayName": "Email Design Set ID", "description": "Design set identifier", "type": "String", "maxLength": 100 },
+        { "logicalName": "emaildesignid", "schemaName": "EmailDesignId", "displayName": "Email Design ID", "description": "Specific design", "type": "String", "maxLength": 100 },
+        { "logicalName": "stage", "schemaName": "Stage", "displayName": "Stage", "description": "When to send (Envelope_Start, Signer_Complete, etc)", "type": "String", "maxLength": 100 },
+        { "logicalName": "step", "schemaName": "Step", "displayName": "Step", "description": "Signer step number", "type": "Integer", "minValue": 0, "maxValue": 100 },
+        { "logicalName": "subject", "schemaName": "Subject", "displayName": "Subject", "description": "Email subject", "type": "String", "maxLength": 500 },
+        { "logicalName": "body", "schemaName": "Body", "displayName": "Body", "description": "Email body HTML", "type": "Memo", "maxLength": 10000 },
+        { "logicalName": "custommessage", "schemaName": "CustomMessage", "displayName": "Custom Message", "description": "Additional custom message", "type": "Memo", "maxLength": 5000 },
+        { "logicalName": "recipients", "schemaName": "Recipients", "displayName": "Recipients", "description": "Comma-separated email list", "type": "Memo", "maxLength": 2000 }
+      ]
+    }
+  ]
+}
