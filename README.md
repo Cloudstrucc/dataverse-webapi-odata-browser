@@ -12,8 +12,10 @@ A powerful tool to explore and document Microsoft Dataverse APIs with customizab
 
 * 📚 **Interactive API Documentation**: Generate Swagger UI documentation for your Dataverse environment
 * 🔍 **Publisher Filtering**: Filter entities by publisher with an easy-to-use dropdown
-* 🎯 **Path Filtering**: Automatically filter API paths by pattern (e.g., `digitalsignature`)
-* 🔐 **Dual Authentication**: 
+* 🎯 **Dual Filtering Options**:
+  - **Schema-based Filtering**: Define exact tables and attributes via JSON schema file
+  - **Path Filtering**: Automatically filter API paths by pattern (e.g., `digitalsignature`)
+* 🔐 **Dual Authentication**:
   - **User Identity**: Sign in with your Microsoft account and security roles
   - **Application Identity**: Use app registration for service-to-service authentication
 * 🛡️ **Permission-Based Filtering**: Only shows entities the authenticated identity can access
@@ -75,12 +77,17 @@ To use "Sign in as Application" (client credentials flow):
 Copy the example file and update with your values:
 
 ```bash
-cp .env.example .env
+cp sample.env .env
 ```
 
 Edit `.env` with your configuration:
 
 ```env
+# Azure Resource Configuration
+APP_NAME=your-app-name
+RESOURCE_GROUP=rg-your-app-prod
+LOCATION=canadacentral
+
 # Azure AD Configuration
 client_id=YOUR_CLIENT_ID
 tenant_id=YOUR_TENANT_ID
@@ -97,8 +104,12 @@ scopes=https://your-org.crm.dynamics.com/.default
 redirectUri=http://localhost:3000/auth/callback
 app_scopes=https://your-org.crm.dynamics.com/.default
 
-# Path Filter (optional)
-PATH_FILTER=digitalsignature
+# Schema Configuration (Option 1 - Recommended for custom tables)
+SCHEMA_FILE_PATH=./your-schema.json
+PUBLISHER_PREFIX=cr123
+
+# Path Filter (Option 2 - Alternative to schema)
+# PATH_FILTER=digitalsignature
 
 # Agency Branding
 AGENCY_NAME=Your Organization Name
@@ -115,62 +126,99 @@ npm start
 
 The application will be available at http://localhost:3000.
 
-## 🎨 Customizing Agency Branding
+## 📋 Schema-Based Filtering
 
-The application supports full agency/organization theming through environment variables. No code changes required!
+Schema-based filtering gives you precise control over which tables and attributes appear in your API documentation. This is the recommended approach for custom tables.
 
-### Branding Variables
+### Configuration
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `AGENCY_NAME` | Organization name shown in header/footer | `Elections Canada` | `Statistics Canada` |
-| `AGENCY_URL` | Link in header navigation | `https://www.elections.ca` | `https://www.statcan.gc.ca` |
-| `AGENCY_HEADER_BG` | Header background color (hex) | `#26374a` | `#1a365d` |
-| `AGENCY_ACCENT_COLOR` | Accent color for buttons/badges | `#af3c43` | `#e53e3e` |
+Set these environment variables:
 
-### Example Configurations
-
-**Government of Canada (GC Web Theme):**
 ```env
-AGENCY_NAME=Statistics Canada
-AGENCY_URL=https://www.statcan.gc.ca
-AGENCY_HEADER_BG=#26374a
-AGENCY_ACCENT_COLOR=#af3c43
+# Path to your schema JSON file (relative to server.js)
+SCHEMA_FILE_PATH=./digital-signature-schema.json
+
+# Publisher prefix for custom tables
+# Table "envelope" becomes "cs_envelope" in API paths
+PUBLISHER_PREFIX=cs
 ```
 
-**Custom Corporate:**
-```env
-AGENCY_NAME=Acme Corporation
-AGENCY_URL=https://www.acme.com
-AGENCY_HEADER_BG=#1e40af
-AGENCY_ACCENT_COLOR=#dc2626
+### Schema File Format
+
+Create a JSON file defining your tables and attributes:
+
+```json
+{
+  "tables": [
+    {
+      "logicalName": "envelope",
+      "displayName": "Envelope",
+      "displayNamePlural": "Envelopes",
+      "description": "Envelope container for documents requiring signatures",
+      "primaryAttribute": {
+        "schemaName": "Name",
+        "displayName": "Envelope Name",
+        "description": "Name of the envelope",
+        "maxLength": 200
+      },
+      "attributes": [
+        {
+          "logicalName": "envelopeid",
+          "schemaName": "EnvelopeId",
+          "displayName": "Envelope ID",
+          "description": "Unique envelope identifier",
+          "type": "String",
+          "maxLength": 100
+        },
+        {
+          "logicalName": "status",
+          "schemaName": "Status",
+          "displayName": "Status",
+          "description": "Envelope status",
+          "type": "String",
+          "maxLength": 50
+        },
+        {
+          "logicalName": "sentdate",
+          "schemaName": "SentDate",
+          "displayName": "Sent Date",
+          "description": "When envelope was sent",
+          "type": "DateTime",
+          "format": "DateAndTime"
+        },
+        {
+          "logicalName": "iscancelled",
+          "schemaName": "IsCancelled",
+          "displayName": "Is Cancelled",
+          "description": "Whether envelope was cancelled",
+          "type": "Boolean"
+        }
+      ]
+    }
+  ]
+}
 ```
 
-**Dark Theme:**
-```env
-AGENCY_NAME=Tech Solutions Inc
-AGENCY_URL=https://www.techsolutions.com
-AGENCY_HEADER_BG=#111827
-AGENCY_ACCENT_COLOR=#10b981
-```
+### Supported Attribute Types
 
-### Adding a Logo
+| Type | Description | Additional Properties |
+|------|-------------|----------------------|
+| `String` | Text field | `maxLength`, `format` (Email, Url, Phone) |
+| `Memo` | Multi-line text | `maxLength` |
+| `Integer` | Whole number | `minValue`, `maxValue` |
+| `DateTime` | Date/time field | `format` (DateAndTime, DateOnly) |
+| `Boolean` | Yes/No field | - |
 
-To add a custom logo, modify the header section in `server.js`. Search for `gc-header-logo-name` and replace with an `<img>` tag:
+### Benefits of Schema-Based Filtering
 
-```html
-<!-- Replace this: -->
-<span class="gc-header-logo-name">${AGENCY_NAME}</span>
-
-<!-- With this: -->
-<img src="/your-logo.png" alt="${AGENCY_NAME}" height="40">
-```
-
-Place your logo file in the `public` directory.
+* **Faster**: No need to query Dataverse metadata at runtime
+* **Precise**: Only shows exactly the tables and attributes you define
+* **Documented**: Schema file serves as documentation for your data model
+* **Version Controlled**: Schema changes are tracked in source control
 
 ## 🎯 Path Filtering
 
-Filter the generated API documentation to show only specific routes.
+Alternative to schema-based filtering. Filter the generated API documentation to show only specific routes by pattern.
 
 ### Configuration
 
@@ -196,6 +244,64 @@ PATH_FILTER=
 2. Paths are filtered using case-insensitive regex matching
 3. Unused schemas are automatically cleaned up
 4. The filtered spec is displayed in Swagger UI
+
+> **Note:** Use either `SCHEMA_FILE_PATH` or `PATH_FILTER`, not both. If `SCHEMA_FILE_PATH` is set, it takes precedence.
+
+## 🎨 Customizing Agency Branding
+
+The application supports full agency/organization theming through environment variables. No code changes required!
+
+### Branding Variables
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `AGENCY_NAME` | Organization name shown in header/footer | `Elections Canada` | `Statistics Canada` |
+| `AGENCY_URL` | Link in header navigation | `https://www.elections.ca` | `https://www.statcan.gc.ca` |
+| `AGENCY_HEADER_BG` | Header background color (hex) | `#26374a` | `#1a365d` |
+| `AGENCY_ACCENT_COLOR` | Accent color for buttons/badges | `#af3c43` | `#e53e3e` |
+
+### Example Configurations
+
+**Government of Canada (GC Web Theme):**
+
+```env
+AGENCY_NAME=Statistics Canada
+AGENCY_URL=https://www.statcan.gc.ca
+AGENCY_HEADER_BG=#26374a
+AGENCY_ACCENT_COLOR=#af3c43
+```
+
+**Custom Corporate:**
+
+```env
+AGENCY_NAME=Acme Corporation
+AGENCY_URL=https://www.acme.com
+AGENCY_HEADER_BG=#1e40af
+AGENCY_ACCENT_COLOR=#dc2626
+```
+
+**Dark Theme:**
+
+```env
+AGENCY_NAME=Tech Solutions Inc
+AGENCY_URL=https://www.techsolutions.com
+AGENCY_HEADER_BG=#111827
+AGENCY_ACCENT_COLOR=#10b981
+```
+
+### Adding a Logo
+
+To add a custom logo, modify the header section in `server.js`. Search for `gc-header-logo-name` and replace with an `<img>` tag:
+
+```html
+<!-- Replace this: -->
+<span class="gc-header-logo-name">${AGENCY_NAME}</span>
+
+<!-- With this: -->
+<img src="/your-logo.png" alt="${AGENCY_NAME}" height="40">
+```
+
+Place your logo file in the `public` directory.
 
 ## 📘 Usage Guide
 
@@ -228,6 +334,9 @@ PATH_FILTER=
 
 | Variable | Description | Required | Example |
 |----------|-------------|----------|---------|
+| `APP_NAME` | Azure Web App name (globally unique) | For deploy | `dataverse-api-explorer` |
+| `RESOURCE_GROUP` | Azure Resource Group name | For deploy | `rg-dataverse-prod` |
+| `LOCATION` | Azure region | For deploy | `canadacentral` |
 | `client_id` | Azure AD application client ID | Yes | `3fc17671-754e-497f-a37a-41a9ddbd5a38` |
 | `tenant_id` | Azure AD tenant ID | Yes | `24a46daa-7b87-4566-9eea-281326a1b75c` |
 | `client_secret` | Azure AD application client secret | Yes | `W7q8Q~BXbEk...` |
@@ -236,6 +345,8 @@ PATH_FILTER=
 | `scopes` | OAuth scopes for user auth | Yes | `https://org.crm.dynamics.com/.default` |
 | `app_scopes` | OAuth scopes for app auth | Yes | `https://org.crm.dynamics.com/.default` |
 | `redirectUri` | OAuth redirect URI | Yes | `http://localhost:3000/auth/callback` |
+| `SCHEMA_FILE_PATH` | Path to schema JSON file | No | `./digital-signature-schema.json` |
+| `PUBLISHER_PREFIX` | Prefix for custom tables | No | `cs` |
 | `PATH_FILTER` | Filter pattern for API paths | No | `digitalsignature` |
 | `AGENCY_NAME` | Organization name for branding | No | `Elections Canada` |
 | `AGENCY_URL` | Organization website URL | No | `https://www.elections.ca` |
@@ -258,6 +369,13 @@ PATH_FILTER=
 * Check the publisher prefix is valid if filtering is applied
 * If no entities appear, verify the identity has read permissions
 
+### Schema File Issues
+
+* Verify the JSON syntax is valid: `jq empty your-schema.json`
+* Ensure `SCHEMA_FILE_PATH` is relative to `server.js`
+* Check that `PUBLISHER_PREFIX` matches your Dataverse publisher
+* Confirm the schema file is included in your deployment
+
 ### Path Filter Not Working
 
 * Ensure `PATH_FILTER` is set correctly in `.env`
@@ -278,14 +396,15 @@ PATH_FILTER=
 dataverse-webapi-odata-browser/
 ├── server.js                 # Main application file
 ├── package.json              # Node.js dependencies
-├── .env.example              # Example environment configuration
+├── sample.env                # Example environment configuration
 ├── .env                      # Your environment configuration (not in git)
 ├── README.md                 # This file
+├── digital-signature-schema.json  # Example schema file
 ├── public/                   # Static files (logos, etc.)
 ├── temp/                     # Temporary files (generated specs)
-└── deploy-scripts/           # Azure deployment scripts
-    ├── .env                  # Deployment configuration (create this)
-    ├── 1-create-resources.sh # Create Azure resources
+└── deploy/                   # Azure deployment scripts
+    ├── .env                  # Deployment configuration (create from sample.env)
+    ├── 1-create-azure-resource.sh  # Create Azure resources
     ├── 2-configure-app-settings.sh # Configure app settings
     ├── 3-deploy-app.sh       # Deploy application code
     └── 4-https-only.sh       # Enable HTTPS and final config
@@ -298,69 +417,37 @@ dataverse-webapi-odata-browser/
 Azure App Service is the recommended deployment option as it supports the full Node.js backend with authentication.
 
 #### Requirements
+
 - [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) installed
 - Azure subscription
 - Logged into Azure CLI (`az login`)
 
 #### Step-by-Step Deployment
 
-The `deploy-scripts` folder contains automated deployment scripts that read from a single `.env` configuration file.
+The `deploy` folder contains automated deployment scripts that read from a single `.env` configuration file.
 
-**1. Create the .env file in the deploy-scripts folder**
+**1. Create the .env file in the deploy folder**
 
 ```bash
-cd deploy-scripts
+cd deploy
+cp ../sample.env .env
 ```
 
-Create a `.env` file with your configuration:
-
-```env
-# Azure Resource Configuration
-RESOURCE_GROUP=rg-dataverse-api-explorer
-APP_NAME=dataverse-api-explorer
-LOCATION=canadacentral
-
-# Azure AD Configuration
-client_id=YOUR_CLIENT_ID
-tenant_id=YOUR_TENANT_ID
-client_secret=YOUR_CLIENT_SECRET
-
-# Application Configuration
-session_secret=RANDOM_SESSION_SECRET
-
-# Dataverse Configuration
-dataverse_url=https://your-org.crm.dynamics.com/
-
-# OAuth Configuration
-scopes=https://your-org.crm.dynamics.com/.default
-app_scopes=https://your-org.crm.dynamics.com/.default
-
-# Path Filter (optional)
-PATH_FILTER=digitalsignature
-
-# Agency Branding
-AGENCY_NAME=Your Organization Name
-AGENCY_URL=https://www.your-org.com
-AGENCY_HEADER_BG=#26374a
-AGENCY_ACCENT_COLOR=#af3c43
-```
+Edit `.env` with your configuration (see [Environment Variables Reference](#-environment-variables-reference)).
 
 > **Note:** The `APP_NAME` must be globally unique across Azure. If deployment fails, try a more unique name like `dataverse-api-explorer-yourcompany`.
 
 **2. Make the scripts executable**
 
 ```bash
-chmod +x 1-create-resources.sh
-chmod +x 2-configure-app-settings.sh
-chmod +x 3-deploy-app.sh
-chmod +x 4-https-only.sh
+chmod +x *.sh
 ```
 
 **3. Run the deployment scripts in sequence**
 
 ```bash
 # Step 1: Create Azure resources (Resource Group, App Service Plan, Web App)
-./1-create-resources.sh
+./1-create-azure-resource.sh
 
 # Step 2: Configure all application settings from .env
 ./2-configure-app-settings.sh
@@ -375,6 +462,7 @@ chmod +x 4-https-only.sh
 **4. Update Azure AD App Registration**
 
 Add the new redirect URI to your Azure AD app registration:
+
 1. Go to Azure Portal → Azure AD → App registrations → Your app
 2. Go to **Authentication** → **Add a platform** (or edit existing Web platform)
 3. Add redirect URI: `https://<APP_NAME>.azurewebsites.net/auth/callback`
@@ -382,12 +470,21 @@ Add the new redirect URI to your Azure AD app registration:
 
 Your app will be available at: `https://<APP_NAME>.azurewebsites.net`
 
+#### Schema File Deployment
+
+If using `SCHEMA_FILE_PATH`, the deployment script will:
+- Validate the schema file exists
+- Check JSON syntax
+- Confirm it's included in the deployment package
+
+Ensure your schema file is in the repository root (or update the path accordingly).
+
 #### Deployment Scripts Reference
 
 | Script | Purpose |
 |--------|---------|
-| `1-create-resources.sh` | Creates Resource Group, App Service Plan, and Web App (or updates if they exist) |
-| `2-configure-app-settings.sh` | Sets all environment variables from .env (idempotent - safe to re-run) |
+| `1-create-azure-resource.sh` | Creates Resource Group, App Service Plan, and Web App (or updates if they exist) |
+| `2-configure-app-settings.sh` | Sets all environment variables including `SCHEMA_FILE_PATH` and `PUBLISHER_PREFIX` |
 | `3-deploy-app.sh` | Deploys code via ZIP upload or GitHub integration |
 | `4-https-only.sh` | Enables HTTPS-only, Always On, and sets startup command |
 
@@ -416,6 +513,7 @@ az webapp restart --name <APP_NAME> --resource-group <RESOURCE_GROUP>
 If you only need to display pre-generated Swagger documentation (no dynamic generation), you can use Azure Static Web Apps for a cost-effective, serverless solution.
 
 #### Prerequisites
+
 - Pre-generated `swagger.json` file
 - GitHub repository
 
@@ -506,6 +604,7 @@ swa deploy ./static-swagger --env production
 ```
 
 Or deploy via Azure Portal:
+
 1. Go to Azure Portal → Create Resource → Static Web App
 2. Connect to your GitHub repository
 3. Set app location to `/static-swagger`
@@ -594,6 +693,7 @@ Go to Power Pages Management → Web Templates → New:
 **Name:** `Swagger API Documentation`
 
 **Source:**
+
 ```html
 {% extends 'Layout 1 Column' %}
 
@@ -662,6 +762,7 @@ Go to Power Pages Management → Web Templates → New:
 **3. Create a Page Template**
 
 Go to Power Pages Management → Page Templates → New:
+
 - **Name:** `API Documentation Template`
 - **Web Template:** Select "Swagger API Documentation"
 - **Use Website Header and Footer:** Yes
@@ -669,6 +770,7 @@ Go to Power Pages Management → Page Templates → New:
 **4. Create a Web Page**
 
 Go to Power Pages Management → Web Pages → New:
+
 - **Name:** `API Documentation`
 - **Page Template:** Select "API Documentation Template"
 - **Partial URL:** `api-docs`
@@ -801,6 +903,7 @@ Embed Swagger UI directly in Power Pages without external hosting by storing the
 **1. Upload swagger.json as Web File**
 
 Go to Power Pages Management → Web Files → New:
+
 - **Name:** `swagger-spec`
 - **Partial URL:** `swagger.json`
 - **Upload:** Your generated swagger.json file
@@ -852,6 +955,7 @@ Go to Power Pages Management → Web Files → New:
 | Feature | App Service | Static Web App | Blob Storage | Power Pages |
 |---------|-------------|----------------|--------------|-------------|
 | Dynamic API Generation | ✅ | ❌ | ❌ | ❌ |
+| Schema-Based Filtering | ✅ | Pre-generated | Pre-generated | Pre-generated |
 | User/App Authentication | ✅ | ❌ | ❌ | Via Portal |
 | Path Filtering | ✅ | Pre-generated | Pre-generated | Pre-generated |
 | Agency Branding | ✅ Dynamic | Static | Static | ✅ Liquid |
